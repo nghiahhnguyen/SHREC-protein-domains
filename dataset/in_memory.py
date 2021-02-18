@@ -2,11 +2,16 @@ import torch
 from torch_geometric.data import InMemoryDataset
 from torch_geometric import io as tgio
 
+from .io import read_off
+
+
 class InMemoryProteinSurfaceDataset(InMemoryDataset):
-    def __init__(self, root, list_examples, final=False, use_txt=False, transform=None, pre_transform=None):
+    def __init__(self, root, list_examples, off_folder_path, txt_folder_path, final=False, use_txt=False, transform=None, pre_transform=None):
         self.list_examples = list_examples
         self.use_txt = use_txt
         self.final = final
+        self.off_folder_path = off_folder_path
+        self.txt_folder_path = txt_folder_path
         super(InMemoryProteinSurfaceDataset, self).__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
     
@@ -15,17 +20,17 @@ class InMemoryProteinSurfaceDataset(InMemoryDataset):
         return ["data.pt"]
 
     def process(self):
-        if self.final == False:
-            off_folder_path = off_train_folder_path
-            txt_folder_path = txt_train_folder_path
-        else:
-            off_folder_path = off_test_folder_path
-            txt_folder_path = txt_test_folder_path
+        # if self.final == False:
+        #     off_folder_path = off_train_folder_path
+        #     txt_folder_path = txt_train_folder_path
+        # else:
+        #     off_folder_path = off_test_folder_path
+        #     txt_folder_path = txt_test_folder_path
         
         data_list = []
         for example_idx, class_idx in self.list_examples:
-            off_path =  f"{off_folder_path}/{example_idx}.off" 
-            txt_path =  f"{txt_folder_path}/{example_idx}.txt"
+            off_path =  f"{self.off_folder_path}/{example_idx}.off" 
+            txt_path =  f"{self.txt_folder_path}/{example_idx}.txt"
             protein = read_off(off_path)
             protein.x = protein.pos
             protein.y = torch.Tensor([class_idx]).type(torch.LongTensor)
