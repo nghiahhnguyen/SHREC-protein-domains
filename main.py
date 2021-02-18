@@ -45,7 +45,7 @@ def main():
                         help='maximum number of epochs')
     parser.add_argument('--patience', type=int, default=50,
                         help='patience for earlystopping')
-    parser.add_argument('--num-examples', type=int, default=1000,
+    parser.add_argument('--num-examples', type=int, default=3585,
                         help='patience for earlystopping')
 
     args = parser.parse_args()
@@ -114,7 +114,7 @@ def main():
             loss.backward()
             optimizer.step()
             optimizer.zero_grad()
-        training_loss /= len(train_off_loader)
+        training_loss /= len(train_off_loader.dataset)
         print("Training loss:{}".format(training_loss))
         val_acc, val_loss = test(model, val_off_loader, args)
         print("Validation loss:{}\taccuracy:{}".format(val_loss, val_acc))
