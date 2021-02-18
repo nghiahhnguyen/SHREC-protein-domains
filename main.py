@@ -3,10 +3,20 @@ import torch_geometric.transforms as tgt
 from sys import stdin
 import random
 import argparse
+import configparser
+
+from dataset.in_memory import InMemoryProteinSurfaceDataset
 
 random.seed(167)
-
-classes_path = "/content/data/classTraining.cla"
+config = configparser.ConfigParser()
+config.read("./configs.ini")
+config_paths = config["PATHS"]
+base_path = config_paths["base_path"]
+classes_path = base_path + config_paths["classes_path"]
+off_train_folder_path = base_path + config_paths["off_train_folder_path"]
+off_final_test_folder_path = base_path + config_paths["off_final_test_folder_path"]
+txt_train_folder_path = base_path + config_paths["txt_train_folder_path"]
+txt_final_test_folder_path = base_path + config_paths["txt_final_test_folder_path"]
 
 list_examples = None
 with open(classes_path, "r") as f:
@@ -27,16 +37,18 @@ with open(classes_path, "r") as f:
     test_ratio = 0.15 #@param {type:"number"}
     val_ratio = 0.15 #@param {type:"number"} 
     random.shuffle(list_examples)
-    print(len(list_examples))
-    list_examples = list_examples[:2000]
+    print(f"The number of original examples: {len(list_examples)}")
+    num_examples = 1000 #@param {type:"number"}
+    print(f"The number of original examples: {num_examples}")
+    list_examples = list_examples[:num_examples]
     list_examples_test = list_examples[:int(test_ratio * len(list_examples))]
     list_examples_val = list_examples[int(test_ratio * len(list_examples))+1:int((test_ratio+val_ratio)*len(list_examples))]
     list_examples_train = list_examples[int((test_ratio+val_ratio)*len(list_examples))+1:]
     assert(total_num_examples == count_total_num_examples)  
 
-train_off_dataset = InMemoryProteinSurfaceDataset("/content/data", list_examples_train, transform=tgt.FaceToEdge(True))
-val_off_dataset = ProteinSurfaceDataset("data", list_examples_val, transform=tgt.FaceToEdge(True))
-test_off_dataset = ProteinSurfaceDataset("data", list_examples_test, transform=tgt.FaceToEdge(True))
+train_off_dataset = InMemoryProteinSurfaceDataset(base_path, list_examples_train, transform=tgt.FaceToEdge(True))
+val_off_dataset = InMemoryProteinSurfaceDataset("data", list_examples_val, transform=tgt.FaceToEdge(True))
+test_off_dataset = InMemoryProteinSurfaceDataset("data", list_examples_test, transform=tgt.FaceToEdge(True))
 train_off_loader = tgd.DataLoader(train_off_dataset, batch_size=8, shuffle=True)
 val_off_loader = tgd.DataLoader(val_off_dataset, batch_size=8, shuffle=True)
 test_off_loader = tgd.DataLoader(test_off_dataset, batch_size=8, shuffle=True)
