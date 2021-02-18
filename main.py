@@ -129,7 +129,7 @@ def main():
             break 
 
     test_acc, test_loss = test(model, test_off_loader, args)
-    print("Validation loss:{}\taccuracy:{}".format(test_loss, test_acc))
+    print("Test loss:{}\taccuracy:{}".format(test_loss, test_acc))
 
 if __name__ == "__main__":
     main()
