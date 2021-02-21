@@ -31,9 +31,9 @@ from torch_geometric.nn import GraphConv, TopKPooling
 from torch_geometric.nn import global_mean_pool as gap, global_max_pool as gmp
 import torch.nn.functional as F
 
-class Net(torch.nn.Module):
+class GNN(torch.nn.Module):
     def __init__(self,args):
-        super(Net, self).__init__()
+        super(GNN, self).__init__()
         self.args = args
         self.num_features = args.num_features
         self.nhid = args.nhid

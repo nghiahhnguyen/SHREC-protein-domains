@@ -2,13 +2,13 @@ import torch
 import torch_geometric.data as tgd
 import torch_geometric.transforms as tgt
 from torch.nn import functional as F
-from sys import stdin
 import random
 import argparse
 import configparser
 
 from dataset.in_memory import InMemoryProteinSurfaceDataset
-from models.models import Net
+from models.models import GNN
+from models.pointnet import PointNet
 
 
 def test(model, loader, args):
@@ -46,10 +46,16 @@ def main():
     parser.add_argument('--patience', type=int, default=50,
                         help='patience for earlystopping')
     parser.add_argument('--num-examples', type=int, default=3585,
-                        help='patience for earlystopping')
+                        help='number of examples, all examples by default')
+    parser.add_argument('--meshes-to-points', type=int, default=0,
+                        help='convert the initial meshes to points cloud')
+    parser.add_argument('--face-to-edge', type=int, default=1,
+                        help='convert the faces to edge index')
+    parser.add_argument('--model', default="gnn",
+                        help='main model')
 
     args = parser.parse_args()
-    random.seed(167)
+    random.seed(args.seed)
     config = configparser.ConfigParser()
     config.read("config.ini")
     config_paths = config["PATHS"]
@@ -84,9 +90,16 @@ def main():
         list_examples_train = list_examples[int((test_ratio+val_ratio)*len(list_examples))+1:]
         assert(total_num_examples == count_total_num_examples)  
 
-    train_off_dataset = InMemoryProteinSurfaceDataset(base_path, list_examples_train, off_train_folder_path, txt_train_folder_path, transform=tgt.FaceToEdge(True))
-    val_off_dataset = InMemoryProteinSurfaceDataset(base_path, list_examples_val, off_train_folder_path, txt_train_folder_path, transform=tgt.FaceToEdge(True))
-    test_off_dataset = InMemoryProteinSurfaceDataset(base_path, list_examples_test, off_train_folder_path, txt_train_folder_path, transform=tgt.FaceToEdge(True))
+    list_transforms = []
+    if args.face_to_edge == 1:
+        list_transforms.append(tgt.FaceToEdge(True))
+    if args.meshes_to_points == 1:
+        list_transforms.append(tgt.SamplePoints(num=128))
+    transforms = tgt.Compose(list_transforms)
+
+    train_off_dataset = InMemoryProteinSurfaceDataset(base_path, list_examples_train, off_train_folder_path, txt_train_folder_path, transform=transforms)
+    val_off_dataset = InMemoryProteinSurfaceDataset(base_path, list_examples_val, off_train_folder_path, txt_train_folder_path, transform=transforms)
+    test_off_dataset = InMemoryProteinSurfaceDataset(base_path, list_examples_test, off_train_folder_path, txt_train_folder_path, transform=transforms)
     train_off_loader = tgd.DataLoader(train_off_dataset, batch_size=args.batch_size, shuffle=True)
     val_off_loader = tgd.DataLoader(val_off_dataset, batch_size=args.batch_size, shuffle=True)
     test_off_loader = tgd.DataLoader(test_off_dataset, batch_size=args.batch_size, shuffle=True)
@@ -97,7 +110,11 @@ def main():
 
     print(args)
 
-    model = Net(args).to(args.device)
+    if args.model == "pointnet":
+        model = PointNet(args).to(args.device)
+    else:
+        model = GNN(args).to(args.device)
+
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
 
     min_loss = 1e10
@@ -106,20 +123,20 @@ def main():
         model.train()
         training_loss = 0
         for i, data in enumerate(train_off_loader):
+            optimizer.zero_grad()
             data = data.to(args.device)
             out = model(data)
             target = data.y.long()
             loss = F.nll_loss(out, target)
-            training_loss += loss.item()
+            training_loss += loss.item() * data.num_graphs
             loss.backward()
             optimizer.step()
-            optimizer.zero_grad()
         training_loss /= len(train_off_loader.dataset)
         print("Training loss:{}".format(training_loss))
         val_acc, val_loss = test(model, val_off_loader, args)
         print("Validation loss:{}\taccuracy:{}".format(val_loss, val_acc))
         if val_loss < min_loss:
-            torch.save(model.state_dict(),'latest.pth')
+            torch.save(model.state_dict(),f'{args.model}-latest.pth')
             print("Model saved at epoch{}".format(epoch))
             min_loss = val_loss
             patience = 0

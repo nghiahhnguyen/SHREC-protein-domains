@@ -1,0 +1,1 @@
+python3 main.py --face-to-edge 0 --meshes-to-points 1 --model pointnet
