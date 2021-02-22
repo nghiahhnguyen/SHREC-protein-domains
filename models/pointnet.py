@@ -12,9 +12,9 @@ class PointNet(torch.nn.Module):
 		super(PointNet, self).__init__()
 
 		torch.manual_seed(args.seed)
-		self.conv1 = PointNetLayer(3, 32)
-		self.conv2 = PointNetLayer(32, 32)
-		self.classifier = Linear(32, args.num_classes)
+		self.conv1 = PointNetLayer(3, args.nhid)
+		self.conv2 = PointNetLayer(args.nhid, args.nhid)
+		self.classifier = Linear(args.nhid, args.num_classes)
 
 	def forward(self, data):
 		pos, batch = data.pos, data.batch

@@ -11,17 +11,22 @@ from models.models import GNN
 from models.pointnet import PointNet
 
 
+@torch.no_grad()
 def test(model, loader, args):
     model.eval()
-    correct = 0.
+    correct = 0
     loss = 0.
+    criterion = torch.nn.CrossEntropyLoss()
     for data in loader:
         data = data.to(args.device)
         out = model(data)
-        pred = out.max(dim=1)[1]
-        data.y = data.y.long()
-        correct += pred.eq(data.y).sum().item()
-        loss += F.nll_loss(out,data.y,reduction='sum').item()
+        pred = out.argmax(dim=1)
+        batch_loss = criterion(out, data.y)
+        # print(pred)
+        # print(data.y)
+        correct += int((pred == data.y).sum())
+        # loss += F.nll_loss(out,data.y,reduction='sum').item()
+        loss += batch_loss
     return correct / len(loader.dataset), loss / len(loader.dataset)
 
 def main():
@@ -35,7 +40,7 @@ def main():
                         help='learning rate')
     parser.add_argument('--weight-decay', type=float, default=0.0001,
                         help='weight decay')
-    parser.add_argument('--nhid', type=int, default=128,
+    parser.add_argument('--nhid', type=int, default=256,
                         help='hidden size')
     parser.add_argument('--pooling-ratio', type=float, default=0.5,
                         help='pooling ratio')
@@ -53,6 +58,8 @@ def main():
                         help='convert the faces to edge index')
     parser.add_argument('--model', default="gnn",
                         help='main model')
+    parser.add_argument('--set-x', default=1, type=int,
+                        help='set x features during data processing')
 
     args = parser.parse_args()
     random.seed(args.seed)
@@ -72,13 +79,40 @@ def main():
         num_classes, total_num_examples = map(int, f.readline().split())
         list_examples = []
         count_total_num_examples = 0
+        count_num_examples = [0 for _ in range(num_classes)]
+        examples = [[] for _ in range(num_classes)]
         for class_idx in range(num_classes):
             f.readline() # ignore blank line
             num_examples = int(f.readline().split()[2])
             for j in range(num_examples):
                 example = int(f.readline())
-                list_examples.append((example, class_idx))
+                examples[class_idx].append(example)
                 count_total_num_examples += 1
+                count_num_examples[class_idx] += 1
+        
+        print(f"The number of examples per class:")
+        num_examples = []
+        for i in range(num_classes):
+            print(i, count_num_examples[i])
+            num_examples.append(count_num_examples[i])
+        num_examples.sort()
+        median_num_examples = num_examples[len(num_examples) // 2]
+        median_num_examples = 10
+        print(f"The median of the number of examples per class: {median_num_examples}")
+        
+        for class_idx in range(num_classes):
+            if len(examples[class_idx]) >= median_num_examples:
+                population = examples[class_idx][:]
+                random.shuffle(population)
+                population = population[:median_num_examples]
+            else:
+                population = []
+                for _ in range(median_num_examples):
+                    dice = random.randint(0, len(examples[class_idx]) - 1)
+                    population.append(examples[class_idx][dice])
+            for example in population:
+                list_examples.append((example, class_idx))
+
         test_ratio = 0.15 #@param {type:"number"}
         val_ratio = 0.15 #@param {type:"number"} 
         random.shuffle(list_examples)
@@ -91,15 +125,21 @@ def main():
         assert(total_num_examples == count_total_num_examples)  
 
     list_transforms = []
+    random_rotate = tgt.Compose([
+        tgt.RandomRotate(degrees=180, axis=0),
+        tgt.RandomRotate(degrees=180, axis=1),
+        tgt.RandomRotate(degrees=180, axis=2),
+    ])
+    list_transforms.append(random_rotate)
     if args.face_to_edge == 1:
         list_transforms.append(tgt.FaceToEdge(True))
     if args.meshes_to_points == 1:
         list_transforms.append(tgt.SamplePoints(num=128))
     transforms = tgt.Compose(list_transforms)
 
-    train_off_dataset = InMemoryProteinSurfaceDataset(base_path, list_examples_train, off_train_folder_path, txt_train_folder_path, transform=transforms)
-    val_off_dataset = InMemoryProteinSurfaceDataset(base_path, list_examples_val, off_train_folder_path, txt_train_folder_path, transform=transforms)
-    test_off_dataset = InMemoryProteinSurfaceDataset(base_path, list_examples_test, off_train_folder_path, txt_train_folder_path, transform=transforms)
+    train_off_dataset = InMemoryProteinSurfaceDataset(base_path, list_examples_train, off_train_folder_path, txt_train_folder_path, args, transform=transforms)
+    val_off_dataset = InMemoryProteinSurfaceDataset(base_path, list_examples_val, off_train_folder_path, txt_train_folder_path, args, transform=transforms)
+    test_off_dataset = InMemoryProteinSurfaceDataset(base_path, list_examples_test, off_train_folder_path, txt_train_folder_path, args, transform=transforms)
     train_off_loader = tgd.DataLoader(train_off_dataset, batch_size=args.batch_size, shuffle=True)
     val_off_loader = tgd.DataLoader(val_off_dataset, batch_size=args.batch_size, shuffle=True)
     test_off_loader = tgd.DataLoader(test_off_dataset, batch_size=args.batch_size, shuffle=True)
@@ -116,6 +156,7 @@ def main():
         model = GNN(args).to(args.device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
+    criterion = torch.nn.CrossEntropyLoss()
 
     min_loss = 1e10
     patience = 0
@@ -127,14 +168,14 @@ def main():
             data = data.to(args.device)
             out = model(data)
             target = data.y.long()
-            loss = F.nll_loss(out, target)
+            loss = criterion(out, target)
             training_loss += loss.item() * data.num_graphs
             loss.backward()
             optimizer.step()
         training_loss /= len(train_off_loader.dataset)
-        print("Training loss:{}".format(training_loss))
+        print("Training loss: {}".format(training_loss))
         val_acc, val_loss = test(model, val_off_loader, args)
-        print("Validation loss:{}\taccuracy:{}".format(val_loss, val_acc))
+        print("Validation loss: {}\taccuracy:{}".format(val_loss, val_acc))
         if val_loss < min_loss:
             torch.save(model.state_dict(),f'{args.model}-latest.pth')
             print("Model saved at epoch{}".format(epoch))
