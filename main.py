@@ -22,8 +22,6 @@ def test(model, loader, args):
         out = model(data)
         pred = out.argmax(dim=1)
         batch_loss = criterion(out, data.y)
-        # print(pred)
-        # print(data.y)
         correct += int((pred == data.y).sum())
         # loss += F.nll_loss(out,data.y,reduction='sum').item()
         loss += batch_loss
@@ -48,7 +46,7 @@ def main():
                         help='dropout ratio')
     parser.add_argument('--epochs', type=int, default=100000,
                         help='maximum number of epochs')
-    parser.add_argument('--patience', type=int, default=50,
+    parser.add_argument('--patience', type=int, default=500,
                         help='patience for earlystopping')
     parser.add_argument('--num-examples', type=int, default=3585,
                         help='number of examples, all examples by default')
@@ -60,6 +58,10 @@ def main():
                         help='main model')
     parser.add_argument('--set-x', default=1, type=int,
                         help='set x features during data processing')
+    parser.add_argument("--num-instances", type=int, default=-1,
+                        help="Number of instances per class")
+    parser.add_argument("--num-sample-points", type=int, default=-1,
+                        help="Number of points to sample when convert from meshes to points cloud")
 
     args = parser.parse_args()
     random.seed(args.seed)
@@ -96,18 +98,21 @@ def main():
             print(i, count_num_examples[i])
             num_examples.append(count_num_examples[i])
         num_examples.sort()
-        median_num_examples = num_examples[len(num_examples) // 2]
-        median_num_examples = 10
-        print(f"The median of the number of examples per class: {median_num_examples}")
+        if args.num_instances == -1:
+            median_num_examples = num_examples[len(num_examples) // 2]
+            num_instances = median_num_examples
+        else:
+            num_instances = args.num_instances
+        print(f"The number of examples per class: {num_instances}")
         
         for class_idx in range(num_classes):
-            if len(examples[class_idx]) >= median_num_examples:
+            if len(examples[class_idx]) >= num_instances:
                 population = examples[class_idx][:]
                 random.shuffle(population)
-                population = population[:median_num_examples]
+                population = population[:num_instances]
             else:
                 population = []
-                for _ in range(median_num_examples):
+                for _ in range(num_instances):
                     dice = random.randint(0, len(examples[class_idx]) - 1)
                     population.append(examples[class_idx][dice])
             for example in population:
@@ -134,7 +139,7 @@ def main():
     if args.face_to_edge == 1:
         list_transforms.append(tgt.FaceToEdge(True))
     if args.meshes_to_points == 1:
-        list_transforms.append(tgt.SamplePoints(num=128))
+        list_transforms.append(tgt.SamplePoints(num=args.num_sample_points))
     transforms = tgt.Compose(list_transforms)
 
     train_off_dataset = InMemoryProteinSurfaceDataset(base_path, list_examples_train, off_train_folder_path, txt_train_folder_path, args, transform=transforms)
@@ -160,6 +165,7 @@ def main():
 
     min_loss = 1e10
     patience = 0
+    epoch = 0
     for epoch in range(args.epochs):
         model.train()
         training_loss = 0
@@ -185,6 +191,9 @@ def main():
             patience += 1
         if patience > args.patience:
             break 
+
+    if epoch:
+        print("Last epoch before stopping:", epoch)
 
     test_acc, test_loss = test(model, test_off_loader, args)
     print("Test loss:{}\taccuracy:{}".format(test_loss, test_acc))
