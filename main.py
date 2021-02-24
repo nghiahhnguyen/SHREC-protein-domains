@@ -69,7 +69,9 @@ def main():
                         help="Load the latest checkpoint")
     parser.add_argument("--num-features", type=int, default=3,
                         help="Number of feature dimensions")
-    parser.add_argument("--random-rotate", action="store_true",
+    parser.add_argument("--num-classes", type=int, default=144,
+                        help="Number of classes")
+    parser.add_argument("--random-rotate", action="store_true", default=True,
                         help="Use random rotate for data augmentation")
     parser.add_argument("--k", type=int, default=16,
                         help="Number of nearest neighbors for constructing knn graph")
@@ -172,7 +174,7 @@ def main():
 
     args.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # args.num_features = train_off_dataset.num_node_features
-    args.num_classes = int(train_off_dataset.num_classes)
+    # args.num_classes = int(train_off_dataset.num_classes)
     print("Number of features dimension:", args.num_features)
     print("Number of classes:", args.num_classes)
 

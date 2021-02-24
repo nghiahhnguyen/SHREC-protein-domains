@@ -47,7 +47,7 @@ class InMemoryProteinSurfaceDataset(InMemoryDataset):
         torch.save((data, slices), self.processed_paths[0]) 
 
 class ProteinSurfaceDataset(Dataset):
-    def __init__(self, root, list_examples, off_folder_path, txt_folder_path, args, final=False, use_txt=False, transform=None, pre_transform=None):
+    def __init__(self, root, list_examples, off_folder_path, txt_folder_path, args, split, final=False, use_txt=False, transform=None, pre_transform=None):
         self.list_examples = list_examples
         self.use_txt = use_txt
         self.final = final
@@ -55,14 +55,14 @@ class ProteinSurfaceDataset(Dataset):
         self.txt_folder_path = txt_folder_path
         self.set_x = args.set_x
         self.args = args
+        self.split = split
         super(ProteinSurfaceDataset, self).__init__(root, transform, pre_transform)
-        self.data, self.slices = torch.load(self.processed_paths[0])
     
     @property
     def processed_file_names(self):
         ret = []
         for idx in range(self.args.num_examples):
-            ret.append(f"{idx}.pt")
+            ret.append(f"data_{self.split}_{idx}.pt")
         return ret
 
     def process(self):
@@ -80,12 +80,12 @@ class ProteinSurfaceDataset(Dataset):
                 if self.set_x == 1:
                     protein.x = torch.cat((protein.x, txt_data), 1)
             # data_list.append(protein)
-            torch.save(protein, osp.join(self.processed_dir, f"data_{idx}.pt"))
+            torch.save(protein, osp.join(self.processed_dir, f"data_{self.split}_{idx}.pt"))
     
     def len(self):
         return len(self.processed_file_names)
 
     def get(self, idx):
-        data = torch.load(osp.join(self.processed_dir, f"data_{idx}.pt"))
+        data = torch.load(osp.join(self.processed_dir, f"data_{self.split}_{idx}.pt"))
         return data
     
