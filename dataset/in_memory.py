@@ -61,17 +61,15 @@ class ProteinSurfaceDataset(Dataset):
     @property
     def processed_file_names(self):
         ret = []
-        for idx in range(self.args.num_examples):
+        for idx in range(len(self.list_examples)):
             ret.append(f"data_{self.split}_{idx}.pt")
         return ret
 
     def process(self):
-        data_list = []
         for idx, (example_idx, class_idx) in enumerate(self.list_examples):
             off_path =  f"{self.off_folder_path}/{example_idx}.off" 
             txt_path =  f"{self.txt_folder_path}/{example_idx}.txt"
             protein = read_off(off_path)
-            # print(protein)
             if self.set_x == 1:
                 protein.x = protein.pos
             protein.y = torch.Tensor([class_idx]).type(torch.LongTensor)
@@ -79,7 +77,6 @@ class ProteinSurfaceDataset(Dataset):
                 txt_data = tgio.read_txt_array(txt_path)
                 if self.set_x == 1:
                     protein.x = torch.cat((protein.x, txt_data), 1)
-            # data_list.append(protein)
             torch.save(protein, osp.join(self.processed_dir, f"data_{self.split}_{idx}.pt"))
     
     def len(self):
