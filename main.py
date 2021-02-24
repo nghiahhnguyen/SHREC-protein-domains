@@ -66,6 +66,8 @@ def main():
                         help="Load the latest checkpoint")
     parser.add_argument("--num-features", type=int, default=3,
                         help="Number of feature dimensions")
+    parser.add_argument("--num-classes", type=int, default=144,
+                        help="Number of classes")
     parser.add_argument("--random-rotate", action="store_true", default=True,
                         help="Use random rotate for data augmentation")
     parser.add_argument("--k", type=int, default=16,
@@ -153,16 +155,18 @@ def main():
         list_transforms.append(tgt.SamplePoints(num=args.num_sample_points))
     transforms = tgt.Compose(list_transforms)
 
-    train_off_dataset = ProteinSurfaceDataset(base_path, list_examples_train, off_train_folder_path, txt_train_folder_path, args, transform=transforms)
-    val_off_dataset = ProteinSurfaceDataset(base_path, list_examples_val, off_train_folder_path, txt_train_folder_path, args, transform=transforms)
-    test_off_dataset = ProteinSurfaceDataset(base_path, list_examples_test, off_train_folder_path, txt_train_folder_path, args, transform=transforms)
+    DatasetType = ProteinSurfaceDataset
+
+    train_off_dataset = DatasetType(base_path, list_examples_train, off_train_folder_path, txt_train_folder_path, args, "train", transform=transforms)
+    val_off_dataset = DatasetType(base_path, list_examples_val, off_train_folder_path, txt_train_folder_path, args, "val", transform=transforms)
+    test_off_dataset = DatasetType(base_path, list_examples_test, off_train_folder_path, txt_train_folder_path, args, "test", transform=transforms)
     train_off_loader = tgd.DataLoader(train_off_dataset, batch_size=args.batch_size, shuffle=True)
     val_off_loader = tgd.DataLoader(val_off_dataset, batch_size=args.batch_size, shuffle=True)
     test_off_loader = tgd.DataLoader(test_off_dataset, batch_size=args.batch_size, shuffle=True)
 
     args.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # args.num_features = train_off_dataset.num_node_features
-    args.num_classes = int(train_off_dataset.num_classes)
+    # args.num_classes = int(train_off_dataset.num_classes)
     print("Number of features dimension:", args.num_features)
     print("Number of classes:", args.num_classes)
 
