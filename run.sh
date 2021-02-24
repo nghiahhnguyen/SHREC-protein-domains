@@ -1,1 +1,1 @@
-python3 main.py --face-to-edge 0 --meshes-to-points 1 --model pointnet --set-x 0
+python3 main.py --face-to-edge 0 --meshes-to-points 1 --model pointnet --set-x 0 --lr 0.0005 --num-instances 20 --num-sample-points 64
