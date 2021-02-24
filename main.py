@@ -6,7 +6,7 @@ import random
 import argparse
 import configparser
 
-from dataset.in_memory import InMemoryProteinSurfaceDataset
+from dataset.in_memory import InMemoryProteinSurfaceDataset, ProteinSurfaceDataset
 from models.models import GNN
 from models.pointnet import PointNet
 
@@ -48,7 +48,7 @@ def main():
                         help='maximum number of epochs')
     parser.add_argument('--patience', type=int, default=500,
                         help='patience for earlystopping')
-    parser.add_argument('--num-examples', type=int, default=3585,
+    parser.add_argument('--num-examples', type=int, default=-1,
                         help='number of examples, all examples by default')
     parser.add_argument('--meshes-to-points', type=int, default=0,
                         help='convert the initial meshes to points cloud')
@@ -129,7 +129,9 @@ def main():
         test_ratio = 0.15 #@param {type:"number"}
         val_ratio = 0.15 #@param {type:"number"} 
         random.shuffle(list_examples)
-        print(f"The number of original examples: {len(list_examples)}")
+        if args.num_examples == -1:
+            args.num_examples = len(list_examples)
+        print(f"The number of original examples (after oversampling and undersampling): {len(list_examples)}")
         print(f"The number of used examples: {args.num_examples}")
         list_examples = list_examples[:args.num_examples]
         list_examples_test = list_examples[:int(test_ratio * len(list_examples))]
@@ -151,9 +153,9 @@ def main():
         list_transforms.append(tgt.SamplePoints(num=args.num_sample_points))
     transforms = tgt.Compose(list_transforms)
 
-    train_off_dataset = InMemoryProteinSurfaceDataset(base_path, list_examples_train, off_train_folder_path, txt_train_folder_path, args, transform=transforms)
-    val_off_dataset = InMemoryProteinSurfaceDataset(base_path, list_examples_val, off_train_folder_path, txt_train_folder_path, args, transform=transforms)
-    test_off_dataset = InMemoryProteinSurfaceDataset(base_path, list_examples_test, off_train_folder_path, txt_train_folder_path, args, transform=transforms)
+    train_off_dataset = ProteinSurfaceDataset(base_path, list_examples_train, off_train_folder_path, txt_train_folder_path, args, transform=transforms)
+    val_off_dataset = ProteinSurfaceDataset(base_path, list_examples_val, off_train_folder_path, txt_train_folder_path, args, transform=transforms)
+    test_off_dataset = ProteinSurfaceDataset(base_path, list_examples_test, off_train_folder_path, txt_train_folder_path, args, transform=transforms)
     train_off_loader = tgd.DataLoader(train_off_dataset, batch_size=args.batch_size, shuffle=True)
     val_off_loader = tgd.DataLoader(val_off_dataset, batch_size=args.batch_size, shuffle=True)
     test_off_loader = tgd.DataLoader(test_off_dataset, batch_size=args.batch_size, shuffle=True)

@@ -1,6 +1,7 @@
 import torch
-from torch_geometric.data import InMemoryDataset
+from torch_geometric.data import InMemoryDataset, Dataset
 from torch_geometric import io as tgio
+import os.path as osp
 
 from .io import read_off
 
@@ -44,3 +45,47 @@ class InMemoryProteinSurfaceDataset(InMemoryDataset):
             data_list.append(protein)
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0]) 
+
+class ProteinSurfaceDataset(Dataset):
+    def __init__(self, root, list_examples, off_folder_path, txt_folder_path, args, final=False, use_txt=False, transform=None, pre_transform=None):
+        self.list_examples = list_examples
+        self.use_txt = use_txt
+        self.final = final
+        self.off_folder_path = off_folder_path
+        self.txt_folder_path = txt_folder_path
+        self.set_x = args.set_x
+        self.args = args
+        super(ProteinSurfaceDataset, self).__init__(root, transform, pre_transform)
+        self.data, self.slices = torch.load(self.processed_paths[0])
+    
+    @property
+    def processed_file_names(self):
+        ret = []
+        for idx in range(self.args.num_examples):
+            ret.append(f"{idx}.pt")
+        return ret
+
+    def process(self):
+        data_list = []
+        for idx, (example_idx, class_idx) in enumerate(self.list_examples):
+            off_path =  f"{self.off_folder_path}/{example_idx}.off" 
+            txt_path =  f"{self.txt_folder_path}/{example_idx}.txt"
+            protein = read_off(off_path)
+            # print(protein)
+            if self.set_x == 1:
+                protein.x = protein.pos
+            protein.y = torch.Tensor([class_idx]).type(torch.LongTensor)
+            if self.use_txt:
+                txt_data = tgio.read_txt_array(txt_path)
+                if self.set_x == 1:
+                    protein.x = torch.cat((protein.x, txt_data), 1)
+            # data_list.append(protein)
+            torch.save(protein, osp.join(self.processed_dir, f"data_{idx}.pt"))
+    
+    def len(self):
+        return len(self.processed_file_names)
+
+    def get(self, idx):
+        data = torch.load(osp.join(self.processed_dir, f"data_{idx}.pt"))
+        return data
+    
