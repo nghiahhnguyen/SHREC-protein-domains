@@ -129,3 +129,4 @@ dmypy.json
 .pyre/
 latest.pth
 .vscode/settings.json
+config.ini

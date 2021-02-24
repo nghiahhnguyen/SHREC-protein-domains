@@ -15,10 +15,16 @@ class SimpleEdgeConvModel(torch.nn.Module):
 		else:
 			layer = DynamicEdgeConv
 		self.conv1 = nn.Linear(args.num_features * 2, args.nhid)
-		self.edge_conv1 = layer(self.conv1, k=args.k)
+		if args.layer == "edge_conv":
+			self.edge_conv1 = layer(self.conv1)
+		else:
+			self.edge_conv1 = layer(self.conv1, k=args.k)
 		self.conv2 = nn.Linear(args.nhid * 2, args.nhid)
-		self.edge_conv2 = layer(self.conv2, k=args.k)
-		self.classifier = nn.Linear(args.nhid * 2, args.num_classes)
+		if args.layer == "edge_conv":
+			self.edge_conv2 = layer(self.conv2)
+		else:
+			self.edge_conv2 = layer(self.conv2, k=args.k)
+		self.classifier = nn.Linear(args.nhid, args.num_classes)
 		self.args = args
 
 	def forward(self, data):

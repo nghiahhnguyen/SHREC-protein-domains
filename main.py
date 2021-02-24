@@ -9,6 +9,7 @@ import configparser
 from dataset.in_memory import InMemoryProteinSurfaceDataset, ProteinSurfaceDataset
 from models.models import GNN
 from models.pointnet import PointNet
+from models.edge_conv import SimpleEdgeConvModel, EdgeConvModel
 
 
 @torch.no_grad()
@@ -56,6 +57,8 @@ def main():
                         help='convert the faces to edge index')
     parser.add_argument('--model', default="gnn",
                         help='main model')
+    parser.add_argument('--layer', default="gnn",
+                        help='layer to use if you are using simple_edge_conv or edge_conv')
     parser.add_argument('--set-x', default=1, type=int,
                         help='set x features during data processing')
     parser.add_argument("--num-instances", type=int, default=-1,
@@ -66,10 +69,12 @@ def main():
                         help="Load the latest checkpoint")
     parser.add_argument("--num-features", type=int, default=3,
                         help="Number of feature dimensions")
-    parser.add_argument("--random-rotate", action="store_true", default=True,
+    parser.add_argument("--random-rotate", action="store_true",
                         help="Use random rotate for data augmentation")
     parser.add_argument("--k", type=int, default=16,
                         help="Number of nearest neighbors for constructing knn graph")
+    parser.add_argument("--in-memory-dataset", action="store_true",
+                        help="Load the whole dataset into memory (faster but use more memory)")
 
     args = parser.parse_args()
     random.seed(args.seed)
@@ -153,9 +158,14 @@ def main():
         list_transforms.append(tgt.SamplePoints(num=args.num_sample_points))
     transforms = tgt.Compose(list_transforms)
 
-    train_off_dataset = ProteinSurfaceDataset(base_path, list_examples_train, off_train_folder_path, txt_train_folder_path, args, transform=transforms)
-    val_off_dataset = ProteinSurfaceDataset(base_path, list_examples_val, off_train_folder_path, txt_train_folder_path, args, transform=transforms)
-    test_off_dataset = ProteinSurfaceDataset(base_path, list_examples_test, off_train_folder_path, txt_train_folder_path, args, transform=transforms)
+    if args.in_memory_dataset:
+        DatasetType = InMemoryProteinSurfaceDataset
+    else:
+        DatasetType = ProteinSurfaceDataset
+
+    train_off_dataset = DatasetType(base_path, list_examples_train, off_train_folder_path, txt_train_folder_path, args, transform=transforms)
+    val_off_dataset = DatasetType(base_path, list_examples_val, off_train_folder_path, txt_train_folder_path, args, transform=transforms)
+    test_off_dataset = DatasetType(base_path, list_examples_test, off_train_folder_path, txt_train_folder_path, args, transform=transforms)
     train_off_loader = tgd.DataLoader(train_off_dataset, batch_size=args.batch_size, shuffle=True)
     val_off_loader = tgd.DataLoader(val_off_dataset, batch_size=args.batch_size, shuffle=True)
     test_off_loader = tgd.DataLoader(test_off_dataset, batch_size=args.batch_size, shuffle=True)
@@ -170,6 +180,10 @@ def main():
 
     if args.model == "pointnet":
         model = PointNet(args).to(args.device)
+    elif args.model == "simple_edge_conv":
+        model = SimpleEdgeConvModel(args).to(args.device)
+    elif args.model == "edge_conv":
+        model = EdgeConvModel(args).to(args.device)
     else:
         model = GNN(args).to(args.device)
     
