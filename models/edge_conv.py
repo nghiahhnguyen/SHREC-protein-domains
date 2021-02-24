@@ -81,23 +81,35 @@ class EdgeConvModel(torch.nn.Module):
 		self.conv1 = nn.Sequential(nn.Conv2d(6, 64, kernel_size=1, bias=False),
 								self.bn1,
 								nn.LeakyReLU(negative_slope=0.2))
-		self.edge_conv1 = layer(self.conv1, k=args.k)
+		if args.layer == "edge_conv":
+			self.edge_conv1 = layer(self.conv1)
+		else:
+			self.edge_conv1 = layer(self.conv1, k=args.k)
 		self.conv2 = nn.Sequential(nn.Conv2d(64*2, 64, kernel_size=1, bias=False),
 								self.bn2,
 								nn.LeakyReLU(negative_slope=0.2))
-		self.edge_conv2 = layer(self.conv2, k=args.k)
+		if args.layer == "edge_conv":
+			self.edge_conv2 = layer(self.conv2)
+		else:
+			self.edge_conv2 = layer(self.conv2, k=args.k)
 		self.conv3 = nn.Sequential(nn.Conv2d(64*2, 128, kernel_size=1, bias=False),
 								self.bn3,
 								nn.LeakyReLU(negative_slope=0.2))
-		self.edge_conv3 = layer(self.conv3, k=args.k)
+		if args.layer == "edge_conv":
+			self.edge_conv3 = layer(self.conv3)
+		else:
+			self.edge_conv3 = layer(self.conv3, k=args.k)
 		self.conv4 = nn.Sequential(nn.Conv2d(128*2, 256, kernel_size=1, bias=False),
 								self.bn4,
 								nn.LeakyReLU(negative_slope=0.2))
-		self.edge_conv4 = layer(self.conv4, k=args.k)
-		self.conv5 = nn.Sequential(nn.Conv1d(512, args.emb_dims, kernel_size=1, bias=False),
+		if args.layer == "edge_conv":
+			self.edge_conv4 = layer(self.conv4)
+		else:
+			self.edge_conv4 = layer(self.conv4, k=args.k)
+		self.conv5 = nn.Sequential(nn.Conv1d(512, args.nhid, kernel_size=1, bias=False),
 								self.bn5,
 								nn.LeakyReLU(negative_slope=0.2))
-		self.linear1 = nn.Linear(args.emb_dims*2, 512, bias=False)
+		self.linear1 = nn.Linear(args.nhid * 2, 512, bias=False)
 		self.bn6 = nn.BatchNorm1d(512)
 		self.dp1 = nn.Dropout(p=args.dropout)
 		self.linear2 = nn.Linear(512, 256)
