@@ -175,6 +175,10 @@ def main():
 
     if args.load_latest:
         model.load_state_dict(torch.load(model_save_path))
+        val_acc, val_loss = test(model, val_off_loader, args)
+        print("Validation loss: {}\taccuracy:{}".format(val_loss, val_acc))
+        torch.save(model.state_dict(), model_save_path)
+
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     criterion = torch.nn.CrossEntropyLoss()
 
