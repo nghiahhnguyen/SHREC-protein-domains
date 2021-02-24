@@ -62,6 +62,10 @@ def main():
                         help="Number of instances per class")
     parser.add_argument("--num-sample-points", type=int, default=-1,
                         help="Number of points to sample when convert from meshes to points cloud")
+    parser.add_argument("--load-latest", action="store_true",
+                        help="Load the latest checkpoint")
+    parser.add_argument("--num-features", type=int, default=3,
+                        help="Number of feature dimensions")
 
     args = parser.parse_args()
     random.seed(args.seed)
@@ -92,10 +96,10 @@ def main():
                 count_total_num_examples += 1
                 count_num_examples[class_idx] += 1
         
-        print(f"The number of examples per class:")
+        # print(f"The number of examples per class:")
         num_examples = []
         for i in range(num_classes):
-            print(i, count_num_examples[i])
+            # print(i, count_num_examples[i])
             num_examples.append(count_num_examples[i])
         num_examples.sort()
         if args.num_instances == -1:
@@ -150,8 +154,10 @@ def main():
     test_off_loader = tgd.DataLoader(test_off_dataset, batch_size=args.batch_size, shuffle=True)
 
     args.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    args.num_features = train_off_dataset.num_node_features
+    # args.num_features = train_off_dataset.num_node_features
     args.num_classes = int(train_off_dataset.num_classes)
+    print("Number of features dimension:", args.num_features)
+    print("Number of classes:", args.num_classes)
 
     print(args)
 
@@ -159,7 +165,11 @@ def main():
         model = PointNet(args).to(args.device)
     else:
         model = GNN(args).to(args.device)
+    
+    model_save_path = f'{args.model}-latest.pth'
 
+    if args.load_latest:
+        model.load_state_dict(torch.load(model_save_path))
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     criterion = torch.nn.CrossEntropyLoss()
 
@@ -183,7 +193,7 @@ def main():
         val_acc, val_loss = test(model, val_off_loader, args)
         print("Validation loss: {}\taccuracy:{}".format(val_loss, val_acc))
         if val_loss < min_loss:
-            torch.save(model.state_dict(),f'{args.model}-latest.pth')
+            torch.save(model.state_dict(), model_save_path)
             print("Model saved at epoch{}".format(epoch))
             min_loss = val_loss
             patience = 0
