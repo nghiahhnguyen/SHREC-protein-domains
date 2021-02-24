@@ -77,6 +77,8 @@ def main():
                         help="Number of nearest neighbors for constructing knn graph")
     parser.add_argument("--in-memory-dataset", action="store_true",
                         help="Load the whole dataset into memory (faster but use more memory)")
+    parser.add_argument('--dropout', type=float, default=0.5,
+                        help='dropout rate')
 
     args = parser.parse_args()
     random.seed(args.seed)
