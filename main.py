@@ -66,6 +66,10 @@ def main():
                         help="Load the latest checkpoint")
     parser.add_argument("--num-features", type=int, default=3,
                         help="Number of feature dimensions")
+    parser.add_argument("--random-rotate", action="store_true", default=True,
+                        help="Use random rotate for data augmentation")
+    parser.add_argument("--k", type=int, default=16,
+                        help="Number of nearest neighbors for constructing knn graph")
 
     args = parser.parse_args()
     random.seed(args.seed)
@@ -139,7 +143,8 @@ def main():
         tgt.RandomRotate(degrees=180, axis=1),
         tgt.RandomRotate(degrees=180, axis=2),
     ])
-    list_transforms.append(random_rotate)
+    if args.random_rotate:
+        list_transforms.append(random_rotate)
     if args.face_to_edge == 1:
         list_transforms.append(tgt.FaceToEdge(True))
     if args.meshes_to_points == 1:
