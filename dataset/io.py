@@ -8,7 +8,10 @@ from torch_geometric.data import Data
 
 def parse_off(src):
     # Some files may contain a bug and do not have a carriage return after OFF.
-    src = src[3:]
+    if not src[2]:
+        src = src[3:]
+    else:
+        src = src[1:]
 
     num_nodes, num_faces = [int(item) for item in src[0].split()[:2]]
 

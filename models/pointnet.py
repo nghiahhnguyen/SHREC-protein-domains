@@ -36,3 +36,24 @@ class PointNet(torch.nn.Module):
 
 		# 5. Classifier.
 		return self.classifier(h)
+
+	
+	def encode(self, data):
+		pos, batch = data.pos, data.batch
+		# Compute the kNN graph:
+		# Here, we need to pass the batch vector to the function call in order
+		# to prevent creating edges between points of different examples.
+		# We also add `loop=True` which will add self-loops to the graph in
+		# order to preserve central point information.
+		edge_index = knn_graph(pos, k=16, batch=batch, loop=True)
+
+		# 3. Start bipartite message passing.
+		h = self.conv1(h=pos, pos=pos, edge_index=edge_index)
+		h = h.relu()
+		h = self.conv2(h=h, pos=pos, edge_index=edge_index)
+		h = h.relu()
+
+		# 4. Global Pooling.
+		h = global_max_pool(h, batch)  # [num_examples, hidden_channels]
+
+		return h
