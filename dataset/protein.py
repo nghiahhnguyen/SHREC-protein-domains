@@ -34,22 +34,20 @@ class InMemoryProteinSurfaceDataset(InMemoryDataset):
             off_path =  f"{self.off_folder_path}/{example_idx}.off" 
             txt_path =  f"{self.txt_folder_path}/{example_idx}.txt"
             protein = read_off(off_path)
-            # print(protein)
             if self.set_x == 1:
                 protein.x = protein.pos
             protein.y = torch.Tensor([class_idx]).type(torch.LongTensor)
             if self.use_txt:
                 txt_data = tgio.read_txt_array(txt_path)
-                if self.set_x == 1:
-                    protein.x = torch.cat((protein.x, txt_data), 1)
+                protein.x = torch.cat((protein.pos, txt_data), 1)
             data_list.append(protein)
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0]) 
 
 class ProteinSurfaceDataset(Dataset):
-    def __init__(self, root, list_examples, off_folder_path, txt_folder_path, args, split, final=False, use_txt=False, transform=None, pre_transform=None):
+    def __init__(self, root, list_examples, off_folder_path, txt_folder_path, args, split, final=False, transform=None, pre_transform=None):
         self.list_examples = list_examples
-        self.use_txt = use_txt
+        self.use_txt = args.use_txt
         self.final = final
         self.off_folder_path = off_folder_path
         self.txt_folder_path = txt_folder_path
@@ -75,8 +73,7 @@ class ProteinSurfaceDataset(Dataset):
             protein.y = torch.Tensor([class_idx]).type(torch.LongTensor)
             if self.use_txt:
                 txt_data = tgio.read_txt_array(txt_path)
-                if self.set_x == 1:
-                    protein.x = torch.cat((protein.x, txt_data), 1)
+                protein.x = torch.cat((protein.pos, txt_data), 1)
             torch.save(protein, osp.join(self.processed_dir, f"data_{self.split}_{idx}.pt"))
     
     def len(self):

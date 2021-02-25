@@ -75,8 +75,8 @@ def main():
                         help="Number of nearest neighbors for constructing knn graph")
     parser.add_argument("--in-memory-dataset", action="store_true",
                         help="Load the whole dataset into memory (faster but use more memory)")
-    parser.add_argument('--dropout', type=float, default=0.5,
-                        help='dropout rate')
+    parser.add_argument('--use-txt', action="store_true",
+                        help='whether to use physicochemical information')
 
     args = parser.parse_args()
     random.seed(args.seed)
@@ -89,6 +89,9 @@ def main():
     txt_train_folder_path = base_path + config_paths["txt_train_folder_path"]
     off_final_test_folder_path = base_path + config_paths["off_final_test_folder_path"]
     txt_final_test_folder_path = base_path + config_paths["txt_final_test_folder_path"]
+    configuration = "off"
+    if args.use_txt:
+        configuration += "-txt"
 
     list_examples = None
     with open(classes_path, "r") as f:
@@ -193,7 +196,7 @@ def main():
     else:
         model = GNN(args).to(args.device)
     
-    model_save_path = f'{args.model}-latest.pth'
+    model_save_path = f'{args.model}-{configuration}-latest.pth'
 
     if args.load_latest:
         model.load_state_dict(torch.load(model_save_path))

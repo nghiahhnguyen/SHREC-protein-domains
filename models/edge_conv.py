@@ -116,14 +116,16 @@ class EdgeConvModel(torch.nn.Module):
 		self.graph_pool1 = SAGPooling(args.nhid)
 		self.linear1 = nn.Linear(args.nhid * 2, 512, bias=False)
 		self.bn6 = nn.BatchNorm1d(512)
-		self.dp1 = nn.Dropout(p=args.dropout)
+		self.dp1 = nn.Dropout(p=args.dropout_ratio)
 		self.linear2 = nn.Linear(512, 256)
 		self.bn7 = nn.BatchNorm1d(256)
-		self.dp2 = nn.Dropout(p=args.dropout)
+		self.dp2 = nn.Dropout(p=args.dropout_ratio)
 		self.linear3 = nn.Linear(256, args.num_classes)
 
 	def forward(self, data):
 		pos, batch = data.pos, data.batch
+		if data.x is not None:
+			pos = data.x
 		edge_index = knn_graph(pos, k=self.args.k, batch=batch, loop=True)
 		batch_size = data.num_graphs
 
