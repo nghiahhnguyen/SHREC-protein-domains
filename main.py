@@ -196,6 +196,8 @@ def main():
     else:
         model = GNN(args).to(args.device)
     
+    print(model)
+    
     model_save_path = f'{args.model}-{configuration}-latest.pth'
 
     if args.load_latest:
