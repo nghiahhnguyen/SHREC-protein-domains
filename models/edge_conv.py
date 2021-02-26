@@ -29,6 +29,9 @@ class SimpleEdgeConvModel(torch.nn.Module):
 
 	def forward(self, data):
 		pos, batch = data.pos, data.batch
+		if self.args.use_txt:
+			pos = data.x
+
 		# Compute the kNN graph:
 		# Here, we need to pass the batch vector to the function call in order
 		# to prevent creating edges between points of different examples.
@@ -63,12 +66,6 @@ class EdgeConvModel(torch.nn.Module):
 			layer = EdgeConv
 		else:
 			layer = DynamicEdgeConv
-		# self.conv1 = Linear(args.num_features * 2, args.nhid)
-		# self.edge_conv1 = layer(self.conv1)
-		# self.conv2 = Linear(args.nhid * 2, args.nhid)
-		# self.edge_conv2 = layer(self.conv2)
-		# self.classifier = Linear(args.nhid * 2, args.num_classes)
-
 		self.args = args
 
 		self.conv1 = nn.Sequential
@@ -77,7 +74,6 @@ class EdgeConvModel(torch.nn.Module):
 		self.bn3 = BatchNorm(128)
 		self.bn4 = BatchNorm(256)
 		self.bn5 = BatchNorm(args.nhid)
-
 		self.conv1 = nn.Sequential(nn.Linear(args.num_features*2, 64),
 								self.bn1,
 								nn.LeakyReLU(negative_slope=0.2))
@@ -124,29 +120,22 @@ class EdgeConvModel(torch.nn.Module):
 
 	def forward(self, data):
 		pos, batch = data.pos, data.batch
-		if data.x is not None:
+		if self.args.use_txt:
 			pos = data.x
 		edge_index = knn_graph(pos, k=self.args.k, batch=batch, loop=True)
-		batch_size = data.num_graphs
 
 		if self.args.layer == "edge_conv":
 			edge_info = edge_index
 		else:
 			edge_info = batch
 
+		# print(pos.shape)
 		x1 = self.edge_conv1(pos, edge_info)
 		x2 = self.edge_conv2(x1, edge_info)
 		x3 = self.edge_conv3(x2, edge_info)
 		x4 = self.edge_conv4(x3, edge_info)
 		x = torch.cat((x1, x2, x3, x4), dim=1)
 		x = self.edge_conv5(x, edge_info)
-		# x1 = F.adaptive_max_pool1d(x, 1).view(batch_size, -1)
-		# x2 = F.adaptive_avg_pool1d(x, 1).view(batch_size, -1)
-		# x = torch.cat((x1, x2), 1)
-		# if self.args.layer == "dynamic_edge_conv":
-		# 	edge_index = knn_graph(pos, k=self.args.k, batch=batch, loop=True)
-		# print(x.shape)
-		# print(edge_index.shape)
 		x1 = global_max_pool(x, batch)
 		x2 = global_mean_pool(x, batch)
 		x = torch.cat((x1, x2), 1)

@@ -1,4 +1,5 @@
 import torch
+import gc
 import torch_geometric.data as tgd
 import torch_geometric.transforms as tgt
 from torch.nn import functional as F
@@ -168,9 +169,12 @@ def main():
     else:
         DatasetType = ProteinSurfaceDataset
 
-    train_off_dataset = DatasetType(base_path, list_examples_train, off_train_folder_path, txt_train_folder_path, args, "train", transform=transforms)
-    val_off_dataset = DatasetType(base_path, list_examples_val, off_train_folder_path, txt_train_folder_path, args, "val", transform=transforms)
-    test_off_dataset = DatasetType(base_path, list_examples_test, off_train_folder_path, txt_train_folder_path, args, "test", transform=transforms)
+    dataset_path = f"data/num-instances={args.num_instances}-num-sample-points={args.num_sample_points}-use-txt={args.use_txt}-set-x={args.set_x}"
+    print(f"Dataset path: {dataset_path}")
+
+    train_off_dataset = DatasetType(dataset_path, list_examples_train, off_train_folder_path, txt_train_folder_path, args, "train", transform=transforms)
+    val_off_dataset = DatasetType(dataset_path, list_examples_val, off_train_folder_path, txt_train_folder_path, args, "val", transform=transforms)
+    test_off_dataset = DatasetType(dataset_path, list_examples_test, off_train_folder_path, txt_train_folder_path, args, "test", transform=transforms)
     train_off_loader = tgd.DataLoader(train_off_dataset, batch_size=args.batch_size, shuffle=True)
     val_off_loader = tgd.DataLoader(val_off_dataset, batch_size=args.batch_size, shuffle=True)
     test_off_loader = tgd.DataLoader(test_off_dataset, batch_size=args.batch_size, shuffle=True)
@@ -196,7 +200,7 @@ def main():
     else:
         model = GNN(args).to(args.device)
     
-    print(model)
+    # print(model)
     
     model_save_path = f'{args.model}-{configuration}-latest.pth'
 
@@ -208,6 +212,9 @@ def main():
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     criterion = torch.nn.CrossEntropyLoss()
+    torch.cuda.empty_cache()
+    gc.collect()
+
 
     min_loss = 1e10
     patience = 0
