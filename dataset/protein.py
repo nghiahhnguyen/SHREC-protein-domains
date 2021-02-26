@@ -7,19 +7,20 @@ from .io import read_off
 
 
 class InMemoryProteinSurfaceDataset(InMemoryDataset):
-    def __init__(self, root, list_examples, off_folder_path, txt_folder_path, args, final=False, use_txt=False, transform=None, pre_transform=None):
+    def __init__(self, root, list_examples, off_folder_path, txt_folder_path, args, split, final=False, use_txt=False, transform=None, pre_transform=None):
         self.list_examples = list_examples
         self.use_txt = args.use_txt
         self.final = final
         self.off_folder_path = off_folder_path
         self.txt_folder_path = txt_folder_path
         self.set_x = args.set_x
+        self.split = split
         super(InMemoryProteinSurfaceDataset, self).__init__(root, transform, pre_transform)
         self.data, self.slices = torch.load(self.processed_paths[0])
     
     @property
     def processed_file_names(self):
-        return ["data.pt"]
+        return [f"data-{self.split}.pt"]
 
     def process(self):
         # if self.final == False:
