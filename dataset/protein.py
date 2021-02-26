@@ -9,7 +9,7 @@ from .io import read_off
 class InMemoryProteinSurfaceDataset(InMemoryDataset):
     def __init__(self, root, list_examples, off_folder_path, txt_folder_path, args, final=False, use_txt=False, transform=None, pre_transform=None):
         self.list_examples = list_examples
-        self.use_txt = use_txt
+        self.use_txt = args.use_txt
         self.final = final
         self.off_folder_path = off_folder_path
         self.txt_folder_path = txt_folder_path

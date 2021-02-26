@@ -212,8 +212,8 @@ def main():
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     criterion = torch.nn.CrossEntropyLoss()
-    torch.cuda.empty_cache()
-    gc.collect()
+    # torch.cuda.empty_cache()
+    # gc.collect()
 
 
     min_loss = 1e10
