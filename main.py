@@ -222,19 +222,23 @@ def main():
     for epoch in range(args.epochs):
         model.train()
         training_loss = 0
+        training_acc = 0
         for i, data in enumerate(train_off_loader):
             optimizer.zero_grad()
             data = data.to(args.device)
             out = model(data)
             target = data.y.long()
             loss = criterion(out, target)
+            pred = out.argmax(dim=1)
+            training_acc += int((pred == data.y).sum())
             training_loss += loss.item() * data.num_graphs
             loss.backward()
             optimizer.step()
+        training_acc /= len(train_off_loader.dataset)
         training_loss /= len(train_off_loader.dataset)
-        print("Training loss: {}".format(training_loss))
+        print("Training loss: {}\taccuracy: {}".format(training_loss, training_acc))
         val_acc, val_loss = test(model, val_off_loader, args)
-        print("Validation loss: {}\taccuracy:{}".format(val_loss, val_acc))
+        print("Validation loss: {}\taccuracy: {}".format(val_loss, val_acc))
         if val_loss < min_loss:
             torch.save(model.state_dict(), model_save_path)
             print("Model saved at epoch{}".format(epoch))
