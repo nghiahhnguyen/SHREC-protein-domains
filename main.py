@@ -80,6 +80,8 @@ def main():
                         help='whether to use physicochemical information')
     parser.add_argument('--process-only', action="store_true",
                         help='whether to only process the data and then stop')
+    parser.add_argument('--save-path', default="./",
+                        help='root path for storing processed dataset and models')
 
     args = parser.parse_args()
     random.seed(args.seed)
@@ -171,7 +173,7 @@ def main():
     else:
         DatasetType = ProteinSurfaceDataset
 
-    dataset_path = f"data/num-instances={args.num_instances}-use-txt={args.use_txt}-set-x={args.set_x}"
+    dataset_path = f"{args.save_path}data/num-instances={args.num_instances}-use-txt={args.use_txt}-set-x={args.set_x}"
     print(f"Dataset path: {dataset_path}")
 
     train_off_dataset = DatasetType(dataset_path, list_examples_train, off_train_folder_path, txt_train_folder_path, args, "train", transform=transforms)
@@ -215,7 +217,7 @@ def main():
     
     # print(model)
     
-    model_save_path = f'{args.model}-{configuration}-latest.pth'
+    model_save_path = f'{args.save_path}saved_models/{args.model}-{configuration}-latest.pth'
 
     if args.load_latest:
         model.load_state_dict(torch.load(model_save_path))
