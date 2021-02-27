@@ -11,6 +11,7 @@ from dataset.protein import InMemoryProteinSurfaceDataset, ProteinSurfaceDataset
 from models.models import GNN
 from models.pointnet import PointNet
 from models.edge_conv import SimpleEdgeConvModel, EdgeConvModel
+from utils.transformation import SamplePoints
 
 
 @torch.no_grad()
@@ -165,7 +166,7 @@ def main():
     if args.face_to_edge == 1:
         list_transforms.append(tgt.FaceToEdge(True))
     if args.meshes_to_points == 1:
-        list_transforms.append(tgt.SamplePoints(num=args.num_sample_points))
+        list_transforms.append(SamplePoints(num=args.num_sample_points))
     transforms = tgt.Compose(list_transforms)
 
     if args.in_memory_dataset:
@@ -187,7 +188,7 @@ def main():
     if args.face_to_edge == 1:
         list_transforms.append(tgt.FaceToEdge(True))
     if args.meshes_to_points == 1:
-        list_transforms.append(tgt.SamplePoints(num=args.num_sample_points))
+        list_transforms.append(SamplePoints(num=args.num_sample_points))
     transforms = tgt.Compose(list_transforms)
     unlabeled_test_dataset = InMemoryUnlabeledProteinSurfaceDataset(dataset_path, off_final_test_folder_path, txt_final_test_folder_path, args, transform=list_transforms)
     unlabeled_test_loader = tgd.DataLoader(unlabeled_test_dataset, batch_size=args.batch_size, shuffle=True)
@@ -217,7 +218,7 @@ def main():
     
     # print(model)
     
-    model_save_path = f'{args.save_path}saved_models/{args.model}-{configuration}-latest.pth'
+    model_save_path = f'{args.save_path}saved_models/{args.model}-{configuration}-{args.num_sample_points}-{args.num_instances}-latest.pth'
 
     if args.load_latest:
         model.load_state_dict(torch.load(model_save_path))
@@ -227,9 +228,6 @@ def main():
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     criterion = torch.nn.CrossEntropyLoss()
-    # torch.cuda.empty_cache()
-    # gc.collect()
-
 
     min_loss = 1e10
     patience = 0
@@ -250,7 +248,7 @@ def main():
             loss.backward()
             optimizer.step()
         training_acc /= len(train_off_loader.dataset)
-        training_loss /= len(train_off_dataset.dataset)
+        training_loss /= len(train_off_loader.dataset)
         print("Training loss: {} accuracy: {}".format(training_loss, training_acc))
         val_acc, val_loss = test(model, val_off_loader, args)
         print("Validation loss: {}\taccuracy: {}".format(val_loss, val_acc))
