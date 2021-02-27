@@ -7,7 +7,7 @@ import random
 import argparse
 import configparser
 
-from dataset.protein import InMemoryProteinSurfaceDataset, ProteinSurfaceDataset
+from dataset.protein import InMemoryProteinSurfaceDataset, ProteinSurfaceDataset, InMemoryUnlabeledProteinSurfaceDataset
 from models.models import GNN
 from models.pointnet import PointNet
 from models.edge_conv import SimpleEdgeConvModel, EdgeConvModel
@@ -78,6 +78,8 @@ def main():
                         help="Load the whole dataset into memory (faster but use more memory)")
     parser.add_argument('--use-txt', action="store_true",
                         help='whether to use physicochemical information')
+    parser.add_argument('--process-only', action="store_true",
+                        help='whether to only process the data and then stop')
 
     args = parser.parse_args()
     random.seed(args.seed)
@@ -169,7 +171,7 @@ def main():
     else:
         DatasetType = ProteinSurfaceDataset
 
-    dataset_path = f"data/num-instances={args.num_instances}-num-sample-points={args.num_sample_points}-use-txt={args.use_txt}-set-x={args.set_x}"
+    dataset_path = f"data/num-instances={args.num_instances}-use-txt={args.use_txt}-set-x={args.set_x}"
     print(f"Dataset path: {dataset_path}")
 
     train_off_dataset = DatasetType(dataset_path, list_examples_train, off_train_folder_path, txt_train_folder_path, args, "train", transform=transforms)
@@ -178,6 +180,17 @@ def main():
     train_off_loader = tgd.DataLoader(train_off_dataset, batch_size=args.batch_size, shuffle=True)
     val_off_loader = tgd.DataLoader(val_off_dataset, batch_size=args.batch_size, shuffle=True)
     test_off_loader = tgd.DataLoader(test_off_dataset, batch_size=args.batch_size, shuffle=True)
+
+    list_transforms = []
+    if args.face_to_edge == 1:
+        list_transforms.append(tgt.FaceToEdge(True))
+    if args.meshes_to_points == 1:
+        list_transforms.append(tgt.SamplePoints(num=args.num_sample_points))
+    transforms = tgt.Compose(list_transforms)
+    unlabeled_test_dataset = InMemoryUnlabeledProteinSurfaceDataset(dataset_path, off_final_test_folder_path, txt_final_test_folder_path, args, transform=list_transforms)
+    unlabeled_test_loader = tgd.DataLoader(unlabeled_test_dataset, batch_size=args.batch_size, shuffle=True)
+    if args.process_only:
+        exit()
 
     args.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     # args.num_features = train_off_dataset.num_node_features
@@ -231,12 +244,12 @@ def main():
             loss = criterion(out, target)
             pred = out.argmax(dim=1)
             training_acc += int((pred == data.y).sum())
-            training_loss += loss.item() * data.num_graphs
+            training_loss += loss.item()
             loss.backward()
             optimizer.step()
         training_acc /= len(train_off_loader.dataset)
-        training_loss /= len(train_off_loader.dataset)
-        print("Training loss: {}\taccuracy: {}".format(training_loss, training_acc))
+        training_loss /= len(train_off_dataset.dataset)
+        print("Training loss: {} accuracy: {}".format(training_loss, training_acc))
         val_acc, val_loss = test(model, val_off_loader, args)
         print("Validation loss: {}\taccuracy: {}".format(val_loss, val_acc))
         if val_loss < min_loss:
