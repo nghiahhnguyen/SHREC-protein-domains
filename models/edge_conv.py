@@ -29,8 +29,8 @@ class SimpleEdgeConvModel(torch.nn.Module):
 
 	def forward(self, data):
 		pos, batch = data.pos, data.batch
-		if self.args.use_txt:
-			pos = data.x
+		# if self.args.use_txt:
+		# 	pos = data.x
 
 		# Compute the kNN graph:
 		# Here, we need to pass the batch vector to the function call in order
@@ -120,8 +120,8 @@ class EdgeConvModel(torch.nn.Module):
 
 	def forward(self, data):
 		pos, batch = data.pos, data.batch
-		if self.args.use_txt:
-			pos = data.x
+		# if self.args.use_txt:
+		# 	pos = data.x
 		edge_index = knn_graph(pos, k=self.args.k, batch=batch, loop=True)
 
 		if self.args.layer == "edge_conv":
