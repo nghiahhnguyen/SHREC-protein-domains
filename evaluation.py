@@ -17,11 +17,12 @@ if __name__ == "__main__":
     file_list = [f for _, f in file_list]
     label_arr, dist_arr = label_distance_matrix_from_file(file_list, file_list)
 
-    print(dist_arr)
+    # print(dist_arr)
     # with open(f'{args.method}-submission.txt')
     #     for x_list in dist_arr:
     #         for y in x_list:
-    
+    _, dist_arr = np.dsplit(dist_arr, 2)
+    dist_arr = dist_arr.squeeze()
     df = pd.DataFrame(data=dist_arr[0:, 0:],
                     index=[i for i in range(dist_arr.shape[0])],
                     columns=['' for i in range(dist_arr.shape[1])])

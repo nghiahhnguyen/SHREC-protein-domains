@@ -159,6 +159,7 @@ def main():
         list_examples_test = list_examples[:int(test_ratio * len(list_examples))]
         list_examples_val = list_examples[int(test_ratio * len(list_examples))+1:int((test_ratio+val_ratio)*len(list_examples))]
         list_examples_train = list_examples[int((test_ratio+val_ratio)*len(list_examples))+1:]
+        list_examples_train += list_examples_test
         assert(total_num_examples == count_total_num_examples)  
 
     list_transforms = []
@@ -240,7 +241,7 @@ def main():
         torch.save(model.state_dict(), model_save_path)
 
 
-    if args.model == "train-test":
+    if args.mode == "train-test":
         for epoch in range(args.epochs):
             model.train()
             training_loss = 0
