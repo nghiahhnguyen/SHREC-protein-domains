@@ -14,7 +14,7 @@ bash install_torch_geometric.sh
 
 ## Run code
 
-The code can be run from the file main.py. A sample command can be found in run.sh. You can run the sample command by running:
+The code can be run from the file ```main.py```. A sample command can be found in ```run.sh```. You can run the sample command by running:
 
 ```bash
 bash run.sh
