@@ -129,7 +129,6 @@ class EdgeConvModel(torch.nn.Module):
 		else:
 			edge_info = batch
 
-		# print(pos.shape)
 		x1 = self.edge_conv1(pos, edge_info)
 		x2 = self.edge_conv2(x1, edge_info)
 		x3 = self.edge_conv3(x2, edge_info)

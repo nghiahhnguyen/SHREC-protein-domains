@@ -132,3 +132,4 @@ latest.pth
 config.ini
 data/*
 saved_unlabeled_embeddings/*
+saved_test_labeled_embeddings/*

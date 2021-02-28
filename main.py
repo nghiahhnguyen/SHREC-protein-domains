@@ -9,6 +9,7 @@ import argparse
 import configparser
 from sklearn.metrics.pairwise import euclidean_distances
 from pathlib import Path
+import numpy as np
 
 from dataset.protein import InMemoryProteinSurfaceDataset, ProteinSurfaceDataset, InMemoryUnlabeledProteinSurfaceDataset
 from models.models import GNN
@@ -185,9 +186,9 @@ def main():
     train_off_dataset = DatasetType(dataset_path, list_examples_train, off_train_folder_path, txt_train_folder_path, args, "train", transform=transforms)
     val_off_dataset = DatasetType(dataset_path, list_examples_val, off_train_folder_path, txt_train_folder_path, args, "val", transform=transforms)
     test_off_dataset = DatasetType(dataset_path, list_examples_test, off_train_folder_path, txt_train_folder_path, args, "test", transform=transforms)
-    train_off_loader = tgd.DataLoader(train_off_dataset, batch_size=args.batch_size, shuffle=True)
-    val_off_loader = tgd.DataLoader(val_off_dataset, batch_size=args.batch_size, shuffle=False)
-    test_off_loader = tgd.DataLoader(test_off_dataset, batch_size=args.batch_size, shuffle=False)
+    train_loader = tgd.DataLoader(train_off_dataset, batch_size=args.batch_size, shuffle=True)
+    val_loader = tgd.DataLoader(val_off_dataset, batch_size=args.batch_size, shuffle=False)
+    test_loader = tgd.DataLoader(test_off_dataset, batch_size=args.batch_size, shuffle=False)
 
     list_transforms = []
     if args.face_to_edge == 1:
@@ -233,7 +234,7 @@ def main():
     epoch = 0
     if args.load_latest:
         model.load_state_dict(torch.load(model_save_path))
-        val_acc, val_loss = test(model, val_off_loader, args)
+        val_acc, val_loss = test(model, val_loader, args)
         min_loss = val_loss
         print("Validation loss: {}\taccuracy:{}".format(val_loss, val_acc))
         torch.save(model.state_dict(), model_save_path)
@@ -244,7 +245,7 @@ def main():
             model.train()
             training_loss = 0
             training_acc = 0
-            for i, data in enumerate(train_off_loader):
+            for i, data in enumerate(train_loader):
                 optimizer.zero_grad()
                 data = data.to(args.device)
                 out = model(data)
@@ -255,10 +256,10 @@ def main():
                 training_loss += loss.item()
                 loss.backward()
                 optimizer.step()
-            training_acc /= len(train_off_loader.dataset)
-            training_loss /= len(train_off_loader.dataset)
+            training_acc /= len(train_loader.dataset)
+            training_loss /= len(train_loader.dataset)
             print("Training loss: {} accuracy: {}".format(training_loss, training_acc))
-            val_acc, val_loss = test(model, val_off_loader, args)
+            val_acc, val_loss = test(model, val_loader, args)
             print("Validation loss: {}\taccuracy: {}".format(val_loss, val_acc))
             if val_loss < min_loss:
                 torch.save(model.state_dict(), model_save_path)
@@ -273,7 +274,7 @@ def main():
         if epoch:
             print("Last epoch before stopping:", epoch)
 
-        test_acc, test_loss = test(model, test_off_loader, args)
+        test_acc, test_loss = test(model, test_loader, args)
         print("Test loss:{}\taccuracy:{}".format(test_loss, test_acc))
     
     elif args.mode == "submit":
@@ -285,7 +286,20 @@ def main():
             data = data.to(args.device)
             out = model(data)
             out = out.to("cpu")
-            torch.save(out, f"{folder_path}/{i}.emb")
+            out = out.detach().numpy()
+
+            if data.y:
+                labels = data.y.to("cpu")
+                labels = labels.detach().numpy()
+            else:
+                labels = np.empty(out.shape[0])
+                labels.fill(-1)       
+            # torch.save(out, f"{folder_path}/{i}.emb")
+            pairs = [labels, out]
+            pairs = np.array([*zip(*pairs)])
+            for j, pair in enumerate(pairs):
+                #TODO: save (label, embedding) tuples
+                np.save(f"{folder_path}/{i*args.batch_size + j + 1}", pair)
 
         # directory = os.fsencode(folder_path)
         # embs = []
