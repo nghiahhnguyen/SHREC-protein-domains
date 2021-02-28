@@ -131,3 +131,4 @@ latest.pth
 .vscode/settings.json
 config.ini
 data/*
+saved_unlabeled_embeddings/*

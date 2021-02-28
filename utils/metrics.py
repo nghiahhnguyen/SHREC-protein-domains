@@ -1,7 +1,11 @@
 import numpy as np                                                                                     
 import torch
-from skbio.core.distance import DistanceMatrix
-from sklearn.metrics.pairwise import euclidean_distances
+# from skbio.core.distance import DistanceMatrix
+from sklearn.metrics import pairwise_distances_chunked
+import pandas as pd
+from glob import glob
+import os.path as osp
+
 
 def precision_at_k(r, k):
     """Score is precision @ k
@@ -31,12 +35,22 @@ def precision_at_k(r, k):
         raise ValueError('Relevance score length < k')
     return np.mean(r)
 
-def retrieval_precision(x1, x2, y1, y2):
+def distance_matrix_from_file(x_files, y_files):
+    # file_list = [(int(osp.basename(f).split['.'][0]), f) for f in glob(test_dir + '/*', recursive=True) if not osp.isdir(f)]
+    # file_list = sorted(file_list)
+    dist = np.array([(np.norm(np.load(x)-np.load(y)), y_idx) for x_idx, x in x_files for y_idx, y in y_files])
+
+
+def retrieval_precision(dist, label_dict, k):
     """ Not done yet """
-    dist = torch.from_numpy(euclidean_distances(x1, x2))
-    k = 2
-    # ignore the smallest distance because that is the query
+    # dist = torch.tensor([d for d in pairwise_distances_chunked(x1, x2)])
+    # ignore the smallest distance during because that is the query
     top_k_min_dist_idx = torch.topk(dist, k=k+1, largest=False, dim=-1)[1][:, 1:]
+
+    result = 
+    for rtrv in top_k_min_dist_idx:
+        
+
     mask = y1.unsqueeze(1) == y2
     for i in range(dist.shape[0]):
         for j in range(dist.shape[0]):

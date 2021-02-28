@@ -1,4 +1,5 @@
 import torch
+import os
 import gc
 import torch_geometric.data as tgd
 import torch_geometric.transforms as tgt
@@ -6,12 +7,15 @@ from torch.nn import functional as F
 import random
 import argparse
 import configparser
+from sklearn.metrics.pairwise import euclidean_distances
+from pathlib import Path
 
 from dataset.protein import InMemoryProteinSurfaceDataset, ProteinSurfaceDataset, InMemoryUnlabeledProteinSurfaceDataset
 from models.models import GNN
 from models.pointnet import PointNet
 from models.edge_conv import SimpleEdgeConvModel, EdgeConvModel
 from utils.transformation import SamplePoints
+from utils.model import remove_final_layer
 
 
 @torch.no_grad()
@@ -81,6 +85,8 @@ def main():
     parser.add_argument('--process-only', action="store_true",
                         help='whether to only process the data and then stop')
     parser.add_argument('--save-path', default="./",
+                        help='root path for storing processed dataset and models')
+    parser.add_argument('--mode', default="train-test", choices=["train-test", "submit"],
                         help='root path for storing processed dataset and models')
 
     args = parser.parse_args()
@@ -180,8 +186,8 @@ def main():
     val_off_dataset = DatasetType(dataset_path, list_examples_val, off_train_folder_path, txt_train_folder_path, args, "val", transform=transforms)
     test_off_dataset = DatasetType(dataset_path, list_examples_test, off_train_folder_path, txt_train_folder_path, args, "test", transform=transforms)
     train_off_loader = tgd.DataLoader(train_off_dataset, batch_size=args.batch_size, shuffle=True)
-    val_off_loader = tgd.DataLoader(val_off_dataset, batch_size=args.batch_size, shuffle=True)
-    test_off_loader = tgd.DataLoader(test_off_dataset, batch_size=args.batch_size, shuffle=True)
+    val_off_loader = tgd.DataLoader(val_off_dataset, batch_size=args.batch_size, shuffle=False)
+    test_off_loader = tgd.DataLoader(test_off_dataset, batch_size=args.batch_size, shuffle=False)
 
     list_transforms = []
     if args.face_to_edge == 1:
@@ -189,8 +195,8 @@ def main():
     if args.meshes_to_points == 1:
         list_transforms.append(SamplePoints(num=args.num_sample_points))
     transforms = tgt.Compose(list_transforms)
-    unlabeled_test_dataset = InMemoryUnlabeledProteinSurfaceDataset(dataset_path, off_final_test_folder_path, txt_final_test_folder_path, args, transform=list_transforms)
-    unlabeled_test_loader = tgd.DataLoader(unlabeled_test_dataset, batch_size=args.batch_size, shuffle=True)
+    unlabeled_test_dataset = InMemoryUnlabeledProteinSurfaceDataset(dataset_path, off_final_test_folder_path, txt_final_test_folder_path, args, transform=transforms)
+    unlabeled_test_loader = tgd.DataLoader(unlabeled_test_dataset, batch_size=args.batch_size, shuffle=False)
     if args.process_only:
         exit()
 
@@ -216,14 +222,8 @@ def main():
         model = GNN(args).to(args.device)
     
     # print(model)
-    
-    model_save_path = f'{args.save_path}saved_models/{args.model}-{configuration}-{args.num_sample_points}-{args.nhid}-{args.num_instances}-latest.pth'
-
-    if args.load_latest:
-        model.load_state_dict(torch.load(model_save_path))
-        val_acc, val_loss = test(model, val_off_loader, args)
-        print("Validation loss: {}\taccuracy:{}".format(val_loss, val_acc))
-        torch.save(model.state_dict(), model_save_path)
+    model_subfolder = f"{args.model}-{configuration}-{args.num_sample_points}-{args.nhid}-{args.num_instances}" 
+    model_save_path = f'{args.save_path}saved_models/{model_subfolder}-latest.pth'
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.weight_decay)
     criterion = torch.nn.CrossEntropyLoss()
@@ -231,41 +231,72 @@ def main():
     min_loss = 1e10
     patience = 0
     epoch = 0
-    for epoch in range(args.epochs):
-        model.train()
-        training_loss = 0
-        training_acc = 0
-        for i, data in enumerate(train_off_loader):
-            optimizer.zero_grad()
+    if args.load_latest:
+        model.load_state_dict(torch.load(model_save_path))
+        val_acc, val_loss = test(model, val_off_loader, args)
+        min_loss = val_loss
+        print("Validation loss: {}\taccuracy:{}".format(val_loss, val_acc))
+        torch.save(model.state_dict(), model_save_path)
+
+
+    if args.model == "train-test":
+        for epoch in range(args.epochs):
+            model.train()
+            training_loss = 0
+            training_acc = 0
+            for i, data in enumerate(train_off_loader):
+                optimizer.zero_grad()
+                data = data.to(args.device)
+                out = model(data)
+                target = data.y.long()
+                loss = criterion(out, target)
+                pred = out.argmax(dim=1)
+                training_acc += int((pred == data.y).sum())
+                training_loss += loss.item()
+                loss.backward()
+                optimizer.step()
+            training_acc /= len(train_off_loader.dataset)
+            training_loss /= len(train_off_loader.dataset)
+            print("Training loss: {} accuracy: {}".format(training_loss, training_acc))
+            val_acc, val_loss = test(model, val_off_loader, args)
+            print("Validation loss: {}\taccuracy: {}".format(val_loss, val_acc))
+            if val_loss < min_loss:
+                torch.save(model.state_dict(), model_save_path)
+                print("Model saved at epoch{}".format(epoch))
+                min_loss = val_loss
+                patience = 0
+            else:
+                patience += 1
+            if patience > args.patience:
+                break 
+
+        if epoch:
+            print("Last epoch before stopping:", epoch)
+
+        test_acc, test_loss = test(model, test_off_loader, args)
+        print("Test loss:{}\taccuracy:{}".format(test_loss, test_acc))
+    
+    elif args.mode == "submit":
+        remove_final_layer(model)
+        emb_save_path = f"{args.save_path}saved_unlabeled_embeddings"
+        folder_path = f"{emb_save_path}/{model_subfolder}"
+        Path(folder_path).mkdir(parents=True, exist_ok=True)
+        for i, data in enumerate(unlabeled_test_loader):
             data = data.to(args.device)
             out = model(data)
-            target = data.y.long()
-            loss = criterion(out, target)
-            pred = out.argmax(dim=1)
-            training_acc += int((pred == data.y).sum())
-            training_loss += loss.item()
-            loss.backward()
-            optimizer.step()
-        training_acc /= len(train_off_loader.dataset)
-        training_loss /= len(train_off_loader.dataset)
-        print("Training loss: {} accuracy: {}".format(training_loss, training_acc))
-        val_acc, val_loss = test(model, val_off_loader, args)
-        print("Validation loss: {}\taccuracy: {}".format(val_loss, val_acc))
-        if val_loss < min_loss:
-            torch.save(model.state_dict(), model_save_path)
-            print("Model saved at epoch{}".format(epoch))
-            min_loss = val_loss
-            patience = 0
-        else:
-            patience += 1
-        if patience > args.patience:
-            break 
+            out = out.to("cpu")
+            torch.save(out, f"{folder_path}/{i}.emb")
 
-    if epoch:
-        print("Last epoch before stopping:", epoch)
-
-    test_acc, test_loss = test(model, test_off_loader, args)
-    print("Test loss:{}\taccuracy:{}".format(test_loss, test_acc))
-
+        # directory = os.fsencode(folder_path)
+        # embs = []
+        # i = 0
+        # for file in os.listdir(directory):
+        #     filename = os.fsdecode(file)
+        #     emb = torch.load(f"{folder_path}/{filename}")
+        #     embs.append(embs)
+        #     i += 1
+        # embs = torch.cat(embs, dim=0)
+            
+              
 if __name__ == "__main__":
     main()
