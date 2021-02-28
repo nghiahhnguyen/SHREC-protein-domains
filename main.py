@@ -217,7 +217,7 @@ def main():
     
     # print(model)
     
-    model_save_path = f'{args.save_path}saved_models/{args.model}-{configuration}-{args.num_sample_points}-{args.num_instances}-latest.pth'
+    model_save_path = f'{args.save_path}saved_models/{args.model}-{configuration}-{args.num_sample_points}-{args.nhid}-{args.num_instances}-latest.pth'
 
     if args.load_latest:
         model.load_state_dict(torch.load(model_save_path))
