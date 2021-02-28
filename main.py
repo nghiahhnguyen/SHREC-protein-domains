@@ -26,7 +26,6 @@ def test(model, loader, args):
         pred = out.argmax(dim=1)
         batch_loss = criterion(out, data.y)
         correct += int((pred == data.y).sum())
-        # loss += F.nll_loss(out,data.y,reduction='sum').item()
         loss += batch_loss
     return correct / len(loader.dataset), loss / len(loader.dataset)
 

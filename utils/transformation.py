@@ -49,14 +49,14 @@ class SamplePoints(object):
         if self.use_original:
             dice = torch.random.randint(0, 2)
             pos_sampled = pos[face[dice]]
-            if features is not None:
+            if "features" in locals():
                 features = features[face[dice]]
                 pos_sampled = torch.cat([pos_sampled, features], dim=-1)
         else:
             pos_sampled = pos[face[0]]
             pos_sampled += frac[:, :1] * vec1
             pos_sampled += frac[:, 1:] * vec2
-            if features is not None:
+            if "features" in locals():
                 feat_vec1 = features[face[1]] - features[face[0]]
                 feat_vec2 = features[face[2]] - features[face[0]]
                 features_sampled = features[face[0]]
