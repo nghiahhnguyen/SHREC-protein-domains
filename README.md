@@ -21,3 +21,9 @@ bash run.sh
 ```
 
 If you want to know the meaning of the arguments, you can find more details in the file ```main.py```
+
+## Submission generation
+To generate submission packages for the corresponding method/checkpoint, run
+```bash
+python evaluation.py --method [method/checkpoint]
+```

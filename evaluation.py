@@ -10,29 +10,54 @@ if __name__ == "__main__":
     parser.add_argument('--method', type=str)
     args = parser.parse_args()
 
-    emb_dir = f'/home/nhhnghia/SHREC-protein-domains/saved_{"test_labeled" if args.is_labeled else "unlabeled"}_embeddings/{args.method}'
-    # int(osp.basename(f).split('.')[0]), 
-    file_list = [(int(osp.basename(f).split('.')[0]),f) for f in glob(emb_dir + '/*', recursive=True) if not osp.isdir(f)]
-    file_list = sorted(file_list)
-    file_list = [f for _, f in file_list]
-    label_arr, dist_arr = label_distance_matrix_from_file(file_list, file_list)
 
-    # print(dist_arr)
-    # with open(f'{args.method}-submission.txt')
-    #     for x_list in dist_arr:
-    #         for y in x_list:
-    _, dist_arr = np.dsplit(dist_arr, 2)
-    dist_arr = dist_arr.squeeze()
+    if args.method == 'ensemble':
+        methods = ['pointnet-off-128-256-10', 'edge_conv-off-512-256-10']
+        dist_arr_list = []
+        prob_arr_list = []
+        for method in methods:
+            emb_dir = f'/home/nhhnghia/SHREC-protein-domains/saved_{"test_labeled" if args.is_labeled else "unlabeled"}_embeddings/{method}'
+            # int(osp.basename(f).split('.')[0]), 
+            file_list = [(int(osp.basename(f).split('.')[0]),f) for f in glob(emb_dir + '/*', recursive=True) if not osp.isdir(f) and not osp.basename(f).split('_')[-1] == 'prob.npy']
+            file_list = sorted(file_list)
+            file_list = [f for _, f in file_list]
+            label_arr, dist_arr = label_distance_matrix_from_file(file_list, file_list)
+            _, dist_arr = np.dsplit(dist_arr, 2)
+            dist_arr = dist_arr.squeeze()
+            dist_arr_list.append(dist_arr)
+
+            file_list = [(int(osp.basename(f).split('.')[0].split('_')[0]),f) for f in glob(emb_dir + '/*', recursive=True) if not osp.isdir(f) and osp.basename(f).split('_')[-1] == 'prob.npy']
+            file_list = sorted(file_list)
+            file_list = [f for _, f in file_list]
+            prob = np.array([np.load(f) for f in file_list])
+            prob_arr_list.append(prob)
+
+        dist_arr = np.average(np.array(dist_arr_list), axis=0, weights=[0.4, 0.6])
+        label_arr = np.argmax(np.average(np.array(prob_arr_list), axis=0, weights=[0.4, 0.6]), axis=-1)
+        
+    else:
+
+        emb_dir = f'/home/nhhnghia/SHREC-protein-domains/saved_{"test_labeled" if args.is_labeled else "unlabeled"}_embeddings/{args.method}'
+        # int(osp.basename(f).split('.')[0]), 
+        file_list = [(int(osp.basename(f).split('.')[0]),f) for f in glob(emb_dir + '/*', recursive=True) if not osp.isdir(f) and not osp.basename(f).split('_')[-1] == 'prob.npy']
+        file_list = sorted(file_list)
+        file_list = [f for _, f in file_list]
+        label_arr, dist_arr = label_distance_matrix_from_file(file_list, file_list)
+
+        _, dist_arr = np.dsplit(dist_arr, 2)
+        dist_arr = dist_arr.squeeze()
+
+    with open(f'{args.method}-classification-submission.txt', 'w') as f:
+        for label in label_arr:
+            print(label+1, file=f) 
+
     df = pd.DataFrame(data=dist_arr[0:, 0:],
                     index=[i for i in range(dist_arr.shape[0])],
                     columns=['' for i in range(dist_arr.shape[1])])
 
-    df.to_csv(f'{args.method}-submission.txt', index=False, header=False, sep=' ')
+    df.to_csv(f'{args.method}-retrieval-submission.txt', index=False, header=False, sep=' ')
 
     if args.is_labeled:
-        # label_df = pd.read_csv('/home/nhtduy/SHREC21/protein-physicochemical/trainingClass.csv')
-        # label_df = label_df.sort_values(by=['off_file'])
-        # label_dict = {key: value for key, value in label_df.to_records(index=False)}
         pf = retrieval_success(dist_arr, label_arr, 1)
         ps = retrieval_success(dist_arr, label_arr, 2)
 

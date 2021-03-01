@@ -159,7 +159,7 @@ def main():
         list_examples_test = list_examples[:int(test_ratio * len(list_examples))]
         list_examples_val = list_examples[int(test_ratio * len(list_examples))+1:int((test_ratio+val_ratio)*len(list_examples))]
         list_examples_train = list_examples[int((test_ratio+val_ratio)*len(list_examples))+1:]
-        list_examples_train += list_examples_test
+        # list_examples_train += list_examples_test
         assert(total_num_examples == count_total_num_examples)  
 
     list_transforms = []
@@ -287,20 +287,30 @@ def main():
             data = data.to(args.device)
             out = model(data)
             out = out.to("cpu")
+            pred = torch.nn.Linear(out.shape[1], args.num_classes)(out)
+            prob = F.softmax(pred)
+            pred = torch.argmax(prob, dim=1)
+
             out = out.detach().numpy()
+            pred = pred.detach().numpy()
+            prob = prob.detach().numpy()
 
             if data.y:
                 labels = data.y.to("cpu")
                 labels = labels.detach().numpy()
             else:
-                labels = np.empty(out.shape[0])
-                labels.fill(-1)       
+                # labels = np.empty(out.shape[0])
+                # labels.fill(-1)       
+                labels = pred
             # torch.save(out, f"{folder_path}/{i}.emb")
             pairs = [labels, out]
             pairs = np.array([*zip(*pairs)])
             for j, pair in enumerate(pairs):
                 #TODO: save (label, embedding) tuples
                 np.save(f"{folder_path}/{i*args.batch_size + j + 1}", pair)
+            
+            for j, p in enumerate(prob):
+                np.save(f"{folder_path}/{i*args.batch_size + j + 1}_prob", p)
 
         # directory = os.fsencode(folder_path)
         # embs = []
