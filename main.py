@@ -223,7 +223,6 @@ def main():
     else:
         model = GNN(args).to(args.device)
     
-    # print(model)
     model_subfolder = f"{args.model}-{configuration}-{args.num_sample_points}-{args.nhid}-{args.num_instances}" 
     model_save_path = f'{args.save_path}saved_models/{model_subfolder}-latest.pth'
 
@@ -299,10 +298,7 @@ def main():
                 labels = data.y.to("cpu")
                 labels = labels.detach().numpy()
             else:
-                # labels = np.empty(out.shape[0])
-                # labels.fill(-1)       
                 labels = pred
-            # torch.save(out, f"{folder_path}/{i}.emb")
             pairs = [labels, out]
             pairs = np.array([*zip(*pairs)])
             for j, pair in enumerate(pairs):
@@ -312,16 +308,6 @@ def main():
             for j, p in enumerate(prob):
                 np.save(f"{folder_path}/{i*args.batch_size + j + 1}_prob", p)
 
-        # directory = os.fsencode(folder_path)
-        # embs = []
-        # i = 0
-        # for file in os.listdir(directory):
-        #     filename = os.fsdecode(file)
-        #     emb = torch.load(f"{folder_path}/{filename}")
-        #     embs.append(embs)
-        #     i += 1
-        # embs = torch.cat(embs, dim=0)
-            
               
 if __name__ == "__main__":
     main()
