@@ -254,7 +254,9 @@ def main():
 
 
     if args.mode == "train-test":
+        total_time = 0
         for epoch in range(args.epochs):
+            start = timeit.default_timer()
             model.train()
             training_loss = 0
             training_acc = 0
@@ -281,6 +283,11 @@ def main():
                 patience = 0
             else:
                 patience += 1
+            stop = timeit.default_timer()
+            epoch_time = stop - start
+            print(f"Current epoch time: {epoch_time}s")
+            total_time += epoch_time
+            print(f"Total time: {total_time}s")
             if patience > args.patience:
                 break 
 
