@@ -1,6 +1,6 @@
 # SHREC-protein-domains
 
-This is team HCMUS's submission to SHREC 2021 challenge: [Surface-based protein domains retrieval](http://shrec2021.drugdesign.fr/)
+This is team HCMUS's codebase for the SHREC 2021 challenge: [Surface-based protein domains retrieval](http://shrec2021.drugdesign.fr/)
 
 ## Installation
 
