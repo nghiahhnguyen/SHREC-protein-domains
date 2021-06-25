@@ -1,6 +1,4 @@
 import torch
-import os
-import gc
 import torch_geometric.data as tgd
 import torch_geometric.transforms as tgt
 from torch.nn import functional as F
@@ -10,8 +8,9 @@ import configparser
 from sklearn.metrics.pairwise import euclidean_distances
 from pathlib import Path
 import numpy as np
+import timeit
 
-from dataset.protein import InMemoryProteinSurfaceDataset, ProteinSurfaceDataset, InMemoryUnlabeledProteinSurfaceDataset
+from dataset.protein import PlyDataset, InMemoryProteinSurfaceDataset, ProteinSurfaceDataset, InMemoryUnlabeledProteinSurfaceDataset
 from models.models import GNN
 from models.pointnet import PointNet
 from models.edge_conv import SimpleEdgeConvModel, EdgeConvModel
@@ -87,7 +86,7 @@ def main():
                         help='whether to only process the data and then stop')
     parser.add_argument('--save-path', default="./",
                         help='root path for storing processed dataset and models')
-    parser.add_argument('--mode', default="train-test", choices=["train-test", "submit"],
+    parser.add_argument('--mode', default="train-test", choices=["train-test", "submit", "submit2"],
                         help='root path for storing processed dataset and models')
 
     args = parser.parse_args()
@@ -101,6 +100,12 @@ def main():
     txt_train_folder_path = base_path + config_paths["txt_train_folder_path"]
     off_final_test_folder_path = base_path + config_paths["off_final_test_folder_path"]
     txt_final_test_folder_path = base_path + config_paths["txt_final_test_folder_path"]
+    base_ply_path = config_paths["ply_path"]
+    ply_query_folder_path = base_ply_path + config_paths["ply_query_folder_path"]
+    ply_folder_path = base_ply_path + config_paths["ply_folder_path"]
+
+
+
     configuration = "off"
     if args.use_txt:
         configuration += "-txt"
@@ -183,7 +188,7 @@ def main():
 
     dataset_path = f"{args.save_path}data/num-instances={args.num_instances}-use-txt={args.use_txt}-set-x={args.set_x}"
     print(f"Dataset path: {dataset_path}")
-
+    ply_path = dataset_path
     train_off_dataset = DatasetType(dataset_path, list_examples_train, off_train_folder_path, txt_train_folder_path, args, "train", transform=transforms)
     val_off_dataset = DatasetType(dataset_path, list_examples_val, off_train_folder_path, txt_train_folder_path, args, "val", transform=transforms)
     test_off_dataset = DatasetType(dataset_path, list_examples_test, off_train_folder_path, txt_train_folder_path, args, "test", transform=transforms)
@@ -197,8 +202,16 @@ def main():
     if args.meshes_to_points == 1:
         list_transforms.append(SamplePoints(num=args.num_sample_points))
     transforms = tgt.Compose(list_transforms)
-    unlabeled_test_dataset = InMemoryUnlabeledProteinSurfaceDataset(dataset_path, off_final_test_folder_path, txt_final_test_folder_path, args, transform=transforms)
-    unlabeled_test_loader = tgd.DataLoader(unlabeled_test_dataset, batch_size=args.batch_size, shuffle=False)
+    if args.mode == 'submit':
+        unlabeled_test_dataset = InMemoryUnlabeledProteinSurfaceDataset(dataset_path, off_final_test_folder_path, txt_final_test_folder_path, args, transform=transforms)
+        unlabeled_test_loader = tgd.DataLoader(unlabeled_test_dataset, batch_size=args.batch_size, shuffle=False)
+    if args.mode == 'submit2':
+        unlabeled_dataset = PlyDataset(ply_path, "1",ply_folder_path, args, transform=transforms)
+        unlabeled_loader = tgd.DataLoader(unlabeled_dataset, batch_size=args.batch_size, shuffle=False)
+        unlabeled_query_dataset = PlyDataset(ply_path,"2", ply_query_folder_path, args, transform=transforms)
+        unlabeled_query_loader = tgd.DataLoader(unlabeled_query_dataset, batch_size=args.batch_size, shuffle=False)
+
+
     if args.process_only:
         exit()
 
@@ -241,7 +254,9 @@ def main():
 
 
     if args.mode == "train-test":
+        total_time = 0
         for epoch in range(args.epochs):
+            start = timeit.default_timer()
             model.train()
             training_loss = 0
             training_acc = 0
@@ -268,6 +283,11 @@ def main():
                 patience = 0
             else:
                 patience += 1
+            stop = timeit.default_timer()
+            epoch_time = stop - start
+            print(f"Current epoch time: {epoch_time}s")
+            total_time += epoch_time
+            print(f"Total time: {total_time}s")
             if patience > args.patience:
                 break 
 
@@ -307,7 +327,67 @@ def main():
             
             for j, p in enumerate(prob):
                 np.save(f"{folder_path}/{i*args.batch_size + j + 1}_prob", p)
+    elif args.mode == "submit2":
+        remove_final_layer(model)
+        emb_save_path = f"{args.save_path}submit2_saved_unlabeled_embeddings"
+        folder_path = f"{emb_save_path}/{model_subfolder}"
+        Path(folder_path).mkdir(parents=True, exist_ok=True)
+        Path(emb_save_path).mkdir(parents=True, exist_ok=True)
+        for i, data in enumerate(unlabeled_loader):
+            data = data.to(args.device)
+            out = model(data)
+            out = out.to("cpu")
+            pred = torch.nn.Linear(out.shape[1], args.num_classes)(out)
+            prob = F.softmax(pred)
+            pred = torch.argmax(prob, dim=1)
 
-              
+            out = out.detach().numpy()
+            pred = pred.detach().numpy()
+            prob = prob.detach().numpy()
+
+            if data.y:
+                labels = data.y.to("cpu")
+                labels = labels.detach().numpy()
+            else:
+                labels = pred
+            pairs = [labels, out]
+            pairs = np.array([*zip(*pairs)])
+            for j, pair in enumerate(pairs):
+                #TODO: save (label, embedding) tuples
+                np.save(f"{folder_path}/{i*args.batch_size + j + 1}", pair)
+            
+            for j, p in enumerate(prob):
+                np.save(f"{folder_path}/{i*args.batch_size + j + 1}_prob", p)
+        emb_save_path = f"{args.save_path}submit2_saved_unlabeled_query_embeddings"
+        Path(folder_path).mkdir(parents=True, exist_ok=True)
+        Path(emb_save_path).mkdir(parents=True, exist_ok=True)
+        for i, data in enumerate(unlabeled_query_loader):
+            data = data.to(args.device)
+            out = model(data)
+            out = out.to("cpu")
+            pred = torch.nn.Linear(out.shape[1], args.num_classes)(out)
+            prob = F.softmax(pred)
+            pred = torch.argmax(prob, dim=1)
+
+            out = out.detach().numpy()
+            pred = pred.detach().numpy()
+            prob = prob.detach().numpy()
+
+            if data.y:
+                labels = data.y.to("cpu")
+                labels = labels.detach().numpy()
+            else:
+                labels = pred
+            pairs = [labels, out]
+            pairs = np.array([*zip(*pairs)])
+            for j, pair in enumerate(pairs):
+                #TODO: save (label, embedding) tuples
+                np.save(f"{folder_path}/{i*args.batch_size + j + 1}", pair)
+            
+            for j, p in enumerate(prob):
+                np.save(f"{folder_path}/{i*args.batch_size + j + 1}_prob", p)
+
+
+           
 if __name__ == "__main__":
     main()

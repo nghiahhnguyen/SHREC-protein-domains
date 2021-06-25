@@ -1,5 +1,7 @@
 # SHREC-protein-domains
 
+This is team HCMUS's codebase for the SHREC 2021 challenge: [Surface-based protein domains retrieval](http://shrec2021.drugdesign.fr/)
+
 ## Installation
 
 Our method use the PyTorch Geometric package. We provide instructions to install the package below. Alternatively, a more elaborated installation instruction can be found on the package [documents page](https://pytorch-geometric.readthedocs.io/en/latest/notes/installation.html).

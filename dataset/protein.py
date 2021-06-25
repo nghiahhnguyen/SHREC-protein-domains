@@ -1,10 +1,10 @@
 import torch
+import os
 from torch_geometric.data import InMemoryDataset, Dataset
 from torch_geometric import io as tgio
 import os.path as osp
-
+from torch_geometric.io import read_ply
 from .io import read_off
-
 
 class InMemoryProteinSurfaceDataset(InMemoryDataset):
     def __init__(self, root, list_examples, off_folder_path, txt_folder_path, args, split, final=False, transform=None, pre_transform=None):
@@ -113,3 +113,30 @@ class InMemoryUnlabeledProteinSurfaceDataset(InMemoryDataset):
             data_list.append(protein)
         data, slices = self.collate(data_list)
         torch.save((data, slices), self.processed_paths[0]) 
+
+class PlyDataset(InMemoryDataset):
+    def __init__(self, root, id, ply_folder_path, args, final=False, transform=None, pre_transform=None):
+        self.list_examples = None
+        self.use_txt = args.use_txt
+        self.final = final
+        self.id = id
+        self.ply_folder_path = ply_folder_path
+        self.set_x = args.set_x
+        super(PlyDataset, self).__init__(root, transform, pre_transform)
+        self.data, self.slices = torch.load(self.processed_paths[0])
+    
+    @property
+    def processed_file_names(self):
+        return [f"ply-data-{self.id}.pt"]
+
+    def process(self):
+        self.list_examples = os.listdir(self.ply_folder_path)
+        data_list = []
+        for example_idx in self.list_examples:
+            ply_path =  f"{self.ply_folder_path}/{example_idx}"
+            protein = read_ply(ply_path)
+            if self.set_x == 1:
+                protein.x = protein.pos
+            data_list.append(protein)
+        data, slices = self.collate(data_list)
+        torch.save((data, slices), self.processed_paths[0])
